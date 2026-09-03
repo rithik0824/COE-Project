@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Overview{% endblock %}
+{% block page_title %}Overview{% endblock %}
+
+{% block content %}
+
+<div class="panel" style="margin-bottom: 20px; background: linear-gradient(135deg, rgba(46,125,250,0.15), rgba(0,210,180,0.1)); border: 1px solid rgba(0,210,180,0.3);">
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+    <div>
+      <span class="badge-status badge-assigned" style="font-size: 11px; padding: 3px 8px;">⚡ 5,000+ Records Benchmark Active</span>
+      <h3 style="margin: 6px 0 2px; font-size: 18px;">Large-Scale Simulated Field-Service Dataset</h3>
+      <p class="text-dim" style="margin: 0; font-size: 13px;">
+        Database initialized with 5,006 jobs, 200 technicians, and 10,000+ history logs to demonstrate statistical accuracy and scalability.
+      </p>
+    </div>
+    <div style="display: flex; gap: 8px;">
+      <a href="{{ url_for('analytics') }}" class="btn-fl btn-fl-primary" style="padding: 8px 16px;">📊 View Analytics</a>
+      <a href="{{ url_for('presentation') }}" class="btn-fl" style="padding: 8px 16px; background: rgba(255,255,255,0.1);">📺 Slide Deck</a>
+    </div>
+  </div>
+</div>
+
+<div class="stat-grid">
+  <div class="stat-card">
+    <div class="stat-num">{{ stats.total_jobs }}</div>
+    <div class="stat-label">Total jobs</div>
+  </div>
+  <div class="stat-card accent-teal">
+    <div class="stat-num">{{ stats.assigned }}</div>
+    <div class="stat-label">Assigned</div>
+  </div>
+  <div class="stat-card accent-red">
+    <div class="stat-num">{{ stats.unassigned }}</div>
+    <div class="stat-label">Unassigned</div>
+  </div>
+  <div class="stat-card accent-blue">
+    <div class="stat-num">{{ stats.completed }}</div>
+    <div class="stat-label">Completed</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num">{{ stats.total_tech }}</div>
+    <div class="stat-label">Technicians</div>
+  </div>
+  <div class="stat-card accent-teal">
+    <div class="stat-num">{{ stats.available_tech }}</div>
+    <div class="stat-label">Available now</div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-head">
+    <div>
+      <div class="panel-eyebrow">Live queue</div>
+      <h3>All jobs</h3>
+    </div>
+    <a href="{{ url_for('jobs') }}" class="btn-fl btn-fl-sm">Open jobs board →</a>
+  </div>
+
+  {% if jobs %}
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Customer</th>
+        <th>Skill needed</th>
+        <th>Appointment</th>
+        <th>Technician</th>
+        <th>ETA</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for j in jobs %}
+      <tr class="row-link" data-href="{{ url_for('job_detail', job_id=j.id) }}">
+        <td>{{ j.customer_name }}</td>
+        <td>{{ j.required_skill }}</td>
+        <td class="mono text-dim">{{ j.appointment_time.replace('T', ' ') }}</td>
+        <td>{{ j.tech_name or '—' }}</td>
+        <td>
+          {% if j.eta_low %}
+            <span class="eta-readout">{{ j.eta_low }}–{{ j.eta_high }} min</span>
+          {% else %}
+            <span class="text-dim">—</span>
+          {% endif %}
+        </td>
+        <td><span class="badge-status badge-{{ j.status }}">{{ j.status }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-state">No jobs yet. Head to the Jobs board to create one.</div>
+  {% endif %}
+</div>
+
+<div class="panel">
+  <div class="panel-head">
+    <div>
+      <div class="panel-eyebrow">Field roster</div>
+      <h3>Technicians</h3>
+    </div>
+    <a href="{{ url_for('technicians') }}" class="btn-fl btn-fl-sm">Manage roster →</a>
+  </div>
+  <table class="data-table">
+    <thead>
+      <tr><th>Name</th><th>Skills</th><th>Location (lat, lng)</th><th>Status</th></tr>
+    </thead>
+    <tbody>
+      {% for t in technicians %}
+      <tr>
+        <td>{{ t.name }}</td>
+        <td>
+          {% for s in t.skills.split(',') %}<span class="chip">{{ s }}</span>{% endfor %}
+        </td>
+        <td class="mono text-dim">{{ '%.4f'|format(t.latitude) }}, {{ '%.4f'|format(t.longitude) }}</td>
+        <td><span class="badge-status badge-{{ t.availability }}">{{ t.availability }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}

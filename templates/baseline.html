@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Baseline vs Improved{% endblock %}
+{% block page_title %}Baseline vs Improved ETA{% endblock %}
+
+{% block content %}
+
+<div class="panel">
+  <div class="panel-eyebrow">Why the live system is an improvement</div>
+  <h3>Baseline (fixed ETA) vs Improved (live range)</h3>
+  <p class="text-dim" style="margin-top:8px; max-width:760px;">
+    <strong>Baseline</strong> represents the "before" system: every job is quoted the same fixed
+    {{ fixed_baseline_eta }}-minute ETA regardless of distance, traffic, or technician status — no updates once given.
+    <strong>Improved</strong> is this project's engine: a dynamically computed range that reacts to simulated
+    distance, traffic and delays. Error is measured against a simulated "true" arrival time for each job.
+  </p>
+</div>
+
+<div class="stat-grid" style="grid-template-columns: repeat(4, 1fr);">
+  <div class="stat-card accent-red">
+    <div class="stat-num">{{ avg_baseline_error }}<span style="font-size:14px;">min</span></div>
+    <div class="stat-label">Avg. baseline ETA error</div>
+  </div>
+  <div class="stat-card accent-teal">
+    <div class="stat-num">{{ avg_improved_error }}<span style="font-size:14px;">min</span></div>
+    <div class="stat-label">Avg. improved ETA error</div>
+  </div>
+  <div class="stat-card accent-teal">
+    <div class="stat-num">{{ error_reduction_pct }}%</div>
+    <div class="stat-label">ETA error reduction</div>
+  </div>
+  <div class="stat-card accent-blue">
+    <div class="stat-num">{{ enquiry_reduction_pct }}%</div>
+    <div class="stat-label">Est. fewer status-check calls</div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-head"><h3>Average error comparison</h3></div>
+  <canvas id="errorChart" height="90"></canvas>
+</div>
+
+<div class="panel">
+  <div class="panel-head"><h3>Per-job comparison</h3></div>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Customer</th>
+        <th>Baseline ETA</th>
+        <th>Improved ETA range</th>
+        <th>Simulated actual arrival</th>
+        <th>Baseline error</th>
+        <th>Improved error</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td>{{ r.customer }}</td>
+        <td class="mono">{{ r.baseline_eta }} min</td>
+        <td class="eta-readout">{{ r.improved_low }}–{{ r.improved_high }} min</td>
+        <td class="mono">{{ r.true_arrival }} min</td>
+        <td class="mono" style="color: var(--red);">±{{ r.baseline_error }} min</td>
+        <td class="mono" style="color: var(--teal);">±{{ r.improved_error }} min</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="text-dim" style="font-size:12px; margin-top:14px;">
+    Note: "simulated actual arrival" and the enquiry-reduction figure are illustrative assumptions built for this
+    college project (no real customer-call data exists) — they demonstrate the comparison method rather than
+    claim production-measured results.
+  </p>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+  const ctx = document.getElementById('errorChart');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['Baseline (fixed ETA)', 'Improved (live range)'],
+      datasets: [{
+        label: 'Average ETA error (minutes)',
+        data: [{{ avg_baseline_error }}, {{ avg_improved_error }}],
+        backgroundColor: ['rgba(240,87,107,0.55)', 'rgba(42,214,176,0.55)'],
+        borderColor: ['#F0576B', '#2AD6B0'],
+        borderWidth: 1.5,
+        borderRadius: 6,
+        maxBarThickness: 90
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: '#232B39' }, ticks: { color: '#8B96A8' } },
+        y: { grid: { display: false }, ticks: { color: '#E7ECF3', font: { size: 13 } } }
+      }
+    }
+  });
+</script>
+{% endblock %}

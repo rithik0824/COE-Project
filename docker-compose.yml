@@ -1,0 +1,19 @@
+services:
+  live-eta-system:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: live_eta_technician_service
+    ports:
+      - "5000:5000"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=5000
+      - FLASK_ENV=production
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/dashboard"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s

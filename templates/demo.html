@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Demo Scenarios{% endblock %}
+{% block page_title %}Demo Scenarios{% endblock %}
+
+{% block content %}
+
+<div class="panel">
+  <div class="panel-eyebrow">College project demonstration</div>
+  <h3>Four edge cases, seeded automatically</h3>
+  <p class="text-dim" style="margin-top:8px; max-width:760px;">
+    These four jobs are created automatically every time the app starts, so a reviewer can see each failure mode
+    and how the dispatch engine handles it without configuring anything. Open any card to see the full ETA and
+    assignment history behind it.
+  </p>
+</div>
+
+<div class="scenario-grid">
+  {% set meta = {
+    'heavy_traffic': {'num': '01', 'title': 'Heavy traffic', 'desc': 'A rush-hour appointment causes the traffic multiplier to widen the ETA range significantly instead of promising an exact time.'},
+    'technician_unavailable': {'num': '02', 'title': 'Technician unavailable', 'desc': 'The only technician with the required skill is on leave, so auto-assignment correctly fails and the job is flagged for the dispatcher.'},
+    'service_overrun': {'num': '03', 'title': 'Service running longer than expected', 'desc': 'The assigned technician is still finishing a previous job, so a delay is factored into the ETA and re-simulation pushes it further out.'},
+    'skill_mismatch': {'num': '04', 'title': 'Technician lacks required skill', 'desc': 'No specialist is free, so the dispatcher manually overrides with a generalist technician — the system flags the mismatch instead of hiding it.'}
+  } %}
+  {% for j in jobs %}
+  <div class="scenario-card tag-{{ j.demo_case }}">
+    <div class="scenario-num">SCENARIO {{ meta[j.demo_case].num }}</div>
+    <div class="scenario-title">{{ meta[j.demo_case].title }}</div>
+    <div class="scenario-desc">{{ meta[j.demo_case].desc }}</div>
+    <div class="info-line"><span class="k">Customer</span><span>{{ j.customer_name }}</span></div>
+    <div class="info-line"><span class="k">Skill needed</span><span>{{ j.required_skill }}</span></div>
+    <div class="info-line">
+      <span class="k">Result</span>
+      {% if j.eta_low %}
+        <span class="eta-readout">{{ j.eta_low }}–{{ j.eta_high }} min</span>
+      {% else %}
+        <span class="badge-status badge-unassigned">unassigned</span>
+      {% endif %}
+    </div>
+    <a href="{{ url_for('job_detail', job_id=j.id) }}" class="btn-fl btn-fl-sm" style="margin-top:14px;">View full history →</a>
+  </div>
+  {% endfor %}
+</div>
+
+{% endblock %}

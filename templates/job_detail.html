@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}Job #{{ job.id }}{% endblock %}
+{% block page_title %}Job #{{ job.id }} · {{ job.customer_name }}{% endblock %}
+
+{% block content %}
+
+<a href="{{ url_for('jobs') }}" class="text-dim" style="font-size:13px;">← Back to jobs board</a>
+
+<div class="detail-grid" style="margin-top:16px;">
+  <div>
+    {% if job.eta_low %}
+    <div class="eta-hero">
+      <div class="panel-eyebrow">Live ETA to customer</div>
+      <div>
+        <span class="eta-hero-value">{{ job.eta_low }}–{{ job.eta_high }}</span>
+        <span class="eta-hero-unit">minutes</span>
+      </div>
+      <div style="margin-top:10px; display:flex; align-items:center; gap:10px;">
+        <span class="traffic-tag traffic-{{ job.traffic_level }}">{{ job.traffic_level }} traffic</span>
+        <span class="badge-status badge-{{ job.status }}">{{ job.status }}</span>
+      </div>
+      <div class="eta-hero-reason">Reason: {{ job.delay_reason }}</div>
+    </div>
+    {% else %}
+    <div class="eta-hero" style="border-color: rgba(240,87,107,.35);">
+      <div class="panel-eyebrow">Live ETA to customer</div>
+      <div class="eta-hero-value" style="color: var(--red); font-size:26px;">No technician assigned</div>
+      <div class="eta-hero-reason">{{ job.delay_reason or 'Awaiting dispatcher assignment.' }}</div>
+    </div>
+    {% endif %}
+
+    <div class="panel">
+      <div class="panel-head"><h3>Job details</h3></div>
+      <div class="info-line"><span class="k">Customer</span><span>{{ job.customer_name }}</span></div>
+      <div class="info-line"><span class="k">Required skill</span><span>{{ job.required_skill }}</span></div>
+      <div class="info-line"><span class="k">Appointment time</span><span class="mono">{{ job.appointment_time.replace('T',' ') }}</span></div>
+      <div class="info-line"><span class="k">Customer location</span><span class="mono">{{ '%.4f'|format(job.customer_latitude) }}, {{ '%.4f'|format(job.customer_longitude) }}</span></div>
+      <div class="info-line"><span class="k">Assigned technician</span><span>{{ job.tech_name or '—' }}</span></div>
+      <div class="info-line"><span class="k">Job created</span><span class="mono text-dim">{{ job.created_at }}</span></div>
+
+      <div style="display:flex; gap:10px; margin-top:18px;">
+        {% if job.status != 'completed' %}
+        <form method="POST" action="{{ url_for('resimulate', job_id=job.id) }}">
+          <button class="btn-fl" type="submit">↻ Re-simulate live ETA</button>
+        </form>
+        {% endif %}
+        {% if job.status == 'assigned' %}
+        <form method="POST" action="{{ url_for('complete_job', job_id=job.id) }}"
+              data-confirm="Mark this job as completed and free the technician?">
+          <button class="btn-fl btn-fl-primary" type="submit">✓ Mark completed</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <div class="panel-eyebrow">Dispatcher control</div>
+          <h3>Assign / override technician</h3>
+        </div>
+      </div>
+      <form method="POST" action="{{ url_for('override_job', job_id=job.id) }}">
+        <div class="field-row">
+          <label class="form-label-fl">Select technician</label>
+          <select class="form-control-fl" name="technician_id" required>
+            <option value="">— choose —</option>
+            {% for t in technicians %}
+            <option value="{{ t.id }}" {{ 'selected' if job.assigned_technician_id==t.id }}>
+              {{ t.name }} ({{ t.skills }}) · {{ t.availability }}
+              {{ '· ⚠ no ' + job.required_skill if job.required_skill not in t.skills.split(',') else '' }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field-row">
+          <label class="form-label-fl">Reason for override</label>
+          <input class="form-control-fl" type="text" name="reason" placeholder="e.g. Emergency reassignment, customer requested sooner slot">
+        </div>
+        <button class="btn-fl btn-fl-warn" type="submit" style="width:100%;">Override assignment</button>
+      </form>
+      <p class="text-dim" style="font-size:12px; margin-top:12px;">
+        Technicians without the required skill are marked with ⚠ but can still be selected — the system will log
+        and flag the mismatch rather than silently allowing it.
+      </p>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h3>ETA change history</h3></div>
+      {% if eta_history %}
+      <ul class="timeline">
+        {% for h in eta_history %}
+        <li>
+          <div class="timeline-time">{{ h.changed_at }}</div>
+          <div class="timeline-text"><span class="eta-readout" style="font-size:13.5px;">{{ h.eta_low }}–{{ h.eta_high }} min</span> — {{ h.reason }}</div>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="empty-state">No ETA history yet.</div>
+      {% endif %}
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h3>Assignment history</h3></div>
+      {% if assignment_history %}
+      <ul class="timeline">
+        {% for h in assignment_history %}
+        <li>
+          <div class="timeline-time">{{ h.changed_at }} · {{ h.action.replace('_',' ') }}</div>
+          <div class="timeline-text">{{ h.tech_name or 'Unassigned' }} — {{ h.reason }}</div>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="empty-state">No assignment history yet.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% endblock %}

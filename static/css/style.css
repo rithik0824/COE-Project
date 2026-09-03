@@ -1,0 +1,286 @@
+/* ==========================================================================
+   Fieldline Dispatch Console — design tokens
+   ========================================================================== */
+:root{
+  --bg:            #0F1319;
+  --panel:         #171D26;
+  --panel-alt:     #1D2430;
+  --panel-raised:  #212938;
+  --border:        #2A3242;
+  --border-soft:   #232B39;
+
+  --text:          #E7ECF3;
+  --text-dim:      #8B96A8;
+  --text-faint:    #5C6779;
+
+  --teal:          #2AD6B0;
+  --teal-dim:      rgba(42,214,176,0.14);
+  --amber:         #F2A93B;
+  --amber-dim:     rgba(242,169,59,0.14);
+  --red:           #F0576B;
+  --red-dim:       rgba(240,87,107,0.14);
+  --blue:          #4C8DFF;
+  --blue-dim:      rgba(76,141,255,0.14);
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+}
+
+*{ box-sizing: border-box; }
+
+body{
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', -apple-system, sans-serif;
+  font-size: 14.5px;
+  margin: 0;
+  min-height: 100vh;
+}
+
+h1,h2,h3,h4{
+  font-family: 'Space Grotesk', sans-serif;
+  color: var(--text);
+  margin: 0 0 4px 0;
+}
+
+a{ color: var(--blue); text-decoration: none; }
+
+.mono{ font-family: 'IBM Plex Mono', monospace; }
+
+/* ==========================================================================
+   Shell layout
+   ========================================================================== */
+.shell{ display: flex; min-height: 100vh; }
+
+.sidenav{
+  width: 232px;
+  flex-shrink: 0;
+  background: var(--panel);
+  border-right: 1px solid var(--border-soft);
+  display: flex;
+  flex-direction: column;
+  padding: 22px 16px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+.brand{ display:flex; align-items:center; gap:10px; padding: 4px 6px 26px; }
+.brand-mark{ font-size: 22px; color: var(--teal); }
+.brand-text{ display:flex; flex-direction:column; line-height:1.2; }
+.brand-title{ font-family:'Space Grotesk', sans-serif; font-weight:700; font-size:17px; }
+.brand-sub{ font-size:11px; color: var(--text-dim); letter-spacing: .02em; }
+
+.nav-links{ display:flex; flex-direction:column; gap:2px; flex: 1; }
+.nav-links a{
+  display:flex; align-items:center; gap:10px;
+  color: var(--text-dim);
+  font-size: 14px; font-weight: 500;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  transition: background .12s ease, color .12s ease;
+}
+.nav-links a:hover{ background: var(--panel-alt); color: var(--text); }
+.nav-links a.active{ background: var(--teal-dim); color: var(--teal); }
+.nav-ic{ width: 16px; text-align:center; font-size: 13px; }
+
+.sidenav-foot{ padding-top: 16px; border-top: 1px solid var(--border-soft); }
+.live-pill{
+  display:flex; align-items:center; gap:8px;
+  font-size: 12px; color: var(--teal); font-weight: 500;
+}
+.live-dot{
+  width:7px; height:7px; border-radius:50%; background: var(--teal);
+  box-shadow: 0 0 0 0 rgba(42,214,176,.6);
+  animation: pulse 1.8s infinite;
+}
+@keyframes pulse{
+  0%{ box-shadow: 0 0 0 0 rgba(42,214,176,.55); }
+  70%{ box-shadow: 0 0 0 6px rgba(42,214,176,0); }
+  100%{ box-shadow: 0 0 0 0 rgba(42,214,176,0); }
+}
+.foot-note{ font-size: 11px; color: var(--text-faint); margin: 6px 0 0; }
+
+.main-col{ flex:1; min-width: 0; display:flex; flex-direction:column; }
+
+.topbar{
+  display:flex; align-items:center; justify-content:space-between;
+  padding: 20px 32px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.topbar-title{ font-family:'Space Grotesk',sans-serif; font-weight:600; font-size: 20px; }
+.clock-readout{ font-family:'IBM Plex Mono',monospace; font-size:13px; color: var(--text-dim); }
+
+.content{ padding: 28px 32px 60px; }
+
+/* ==========================================================================
+   Flash messages
+   ========================================================================== */
+.flash-stack{ margin-bottom: 20px; display:flex; flex-direction:column; gap:8px; }
+.flash{
+  padding: 11px 16px; border-radius: var(--radius-sm);
+  font-size: 13.5px; border: 1px solid transparent;
+}
+.flash-success{ background: var(--teal-dim); color: var(--teal); border-color: rgba(42,214,176,.3); }
+.flash-warning{ background: var(--amber-dim); color: var(--amber); border-color: rgba(242,169,59,.3); }
+.flash-info{ background: var(--blue-dim); color: var(--blue); border-color: rgba(76,141,255,.3); }
+.flash-danger{ background: var(--red-dim); color: var(--red); border-color: rgba(240,87,107,.3); }
+
+/* ==========================================================================
+   Cards & panels
+   ========================================================================== */
+.panel{
+  background: var(--panel);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+  padding: 22px;
+  margin-bottom: 22px;
+}
+.panel-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom: 16px; }
+.panel-head h3{ font-size: 15px; font-weight: 600; }
+.panel-eyebrow{ font-size: 11.5px; color: var(--text-dim); margin-bottom: 2px; }
+
+.stat-grid{ display:grid; grid-template-columns: repeat(6, 1fr); gap: 14px; margin-bottom: 22px; }
+.stat-card{
+  background: var(--panel);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  padding: 16px 18px;
+}
+.stat-num{ font-family:'IBM Plex Mono',monospace; font-size: 26px; font-weight:600; line-height:1; }
+.stat-label{ font-size: 12px; color: var(--text-dim); margin-top: 6px; }
+.stat-card.accent-teal .stat-num{ color: var(--teal); }
+.stat-card.accent-amber .stat-num{ color: var(--amber); }
+.stat-card.accent-red .stat-num{ color: var(--red); }
+.stat-card.accent-blue .stat-num{ color: var(--blue); }
+
+@media (max-width: 1100px){ .stat-grid{ grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 640px){ .stat-grid{ grid-template-columns: repeat(2, 1fr); } }
+
+/* ==========================================================================
+   Tables
+   ========================================================================== */
+table.data-table{ width:100%; border-collapse: collapse; }
+.data-table th{
+  text-align:left; font-size: 11.5px; font-weight:600; color: var(--text-dim);
+  padding: 8px 12px; border-bottom: 1px solid var(--border-soft);
+}
+.data-table td{
+  padding: 12px; border-bottom: 1px solid var(--border-soft);
+  font-size: 13.5px; vertical-align: middle;
+}
+.data-table tr:last-child td{ border-bottom: none; }
+.data-table tr:hover td{ background: var(--panel-alt); }
+.row-link{ cursor: pointer; }
+
+/* ==========================================================================
+   Badges
+   ========================================================================== */
+.badge-status{
+  display:inline-flex; align-items:center; gap:5px;
+  padding: 4px 10px; border-radius: 999px;
+  font-size: 11.5px; font-weight: 600; letter-spacing: .01em;
+}
+.badge-assigned, .badge-available{ background: var(--teal-dim); color: var(--teal); }
+.badge-unassigned, .badge-unavailable{ background: var(--red-dim); color: var(--red); }
+.badge-busy, .badge-pending{ background: var(--amber-dim); color: var(--amber); }
+.badge-completed{ background: var(--blue-dim); color: var(--blue); }
+
+.traffic-tag{ font-size: 11.5px; padding: 3px 9px; border-radius: 999px; font-weight:600; }
+.traffic-light{ background: var(--teal-dim); color: var(--teal); }
+.traffic-moderate{ background: var(--amber-dim); color: var(--amber); }
+.traffic-heavy{ background: var(--red-dim); color: var(--red); }
+
+.eta-readout{
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 600; font-size: 15px; color: var(--text);
+}
+
+/* ==========================================================================
+   Buttons & forms
+   ========================================================================== */
+.btn-fl{
+  display:inline-flex; align-items:center; justify-content:center; gap:6px;
+  font-family:'Inter',sans-serif; font-weight: 600; font-size: 13.5px;
+  padding: 9px 16px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); background: var(--panel-alt); color: var(--text);
+  cursor: pointer; transition: background .12s ease, border-color .12s ease;
+}
+.btn-fl:hover{ background: var(--panel-raised); }
+.btn-fl-primary{ background: var(--teal); color: #062622; border-color: var(--teal); }
+.btn-fl-primary:hover{ background: #22c2a0; }
+.btn-fl-warn{ background: transparent; color: var(--amber); border-color: rgba(242,169,59,.4); }
+.btn-fl-warn:hover{ background: var(--amber-dim); }
+.btn-fl-sm{ padding: 6px 12px; font-size: 12.5px; }
+
+.form-label-fl{ font-size: 12.5px; color: var(--text-dim); font-weight:600; margin-bottom:6px; display:block; }
+.form-control-fl, select.form-control-fl{
+  width:100%; background: var(--panel-alt); border: 1px solid var(--border);
+  color: var(--text); border-radius: var(--radius-sm); padding: 9px 12px;
+  font-family:'Inter',sans-serif; font-size: 13.5px;
+}
+.form-control-fl:focus{ outline: none; border-color: var(--teal); }
+.field-row{ margin-bottom: 14px; }
+.field-grid{ display:grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.check-row{ display:flex; flex-wrap:wrap; gap: 10px; }
+.check-pill{
+  display:flex; align-items:center; gap:6px;
+  background: var(--panel-alt); border:1px solid var(--border);
+  padding: 6px 12px; border-radius: 999px; font-size:12.5px;
+}
+
+/* ==========================================================================
+   Job detail / timeline
+   ========================================================================== */
+.detail-grid{ display:grid; grid-template-columns: 1.4fr 1fr; gap: 22px; }
+@media (max-width: 980px){ .detail-grid{ grid-template-columns: 1fr; } }
+
+.eta-hero{
+  background: linear-gradient(135deg, var(--panel-raised), var(--panel));
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+  padding: 26px;
+  margin-bottom: 20px;
+}
+.eta-hero-value{ font-family:'IBM Plex Mono',monospace; font-size: 40px; font-weight: 600; color: var(--teal); line-height:1; }
+.eta-hero-unit{ font-size: 15px; color: var(--text-dim); margin-left:6px; }
+.eta-hero-reason{ margin-top: 12px; font-size: 13.5px; color: var(--text-dim); }
+
+.timeline{ list-style:none; margin:0; padding:0; }
+.timeline li{
+  position: relative; padding: 0 0 18px 20px; border-left: 2px solid var(--border-soft);
+}
+.timeline li:last-child{ border-color: transparent; padding-bottom: 0; }
+.timeline li::before{
+  content:''; position:absolute; left:-6px; top:2px; width:10px; height:10px;
+  border-radius: 50%; background: var(--teal); border: 2px solid var(--panel);
+}
+.timeline-time{ font-family:'IBM Plex Mono',monospace; font-size: 11px; color: var(--text-faint); }
+.timeline-text{ font-size: 13.5px; margin-top: 2px; }
+
+.info-line{ display:flex; justify-content:space-between; padding: 9px 0; border-bottom: 1px solid var(--border-soft); font-size: 13.5px; }
+.info-line:last-child{ border-bottom: none; }
+.info-line .k{ color: var(--text-dim); }
+
+/* ==========================================================================
+   Demo scenario cards
+   ========================================================================== */
+.scenario-grid{ display:grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
+@media (max-width: 900px){ .scenario-grid{ grid-template-columns: 1fr; } }
+.scenario-card{
+  background: var(--panel); border: 1px solid var(--border-soft); border-radius: var(--radius-lg);
+  padding: 20px; border-left: 3px solid var(--teal);
+}
+.scenario-card.tag-heavy_traffic{ border-left-color: var(--red); }
+.scenario-card.tag-technician_unavailable{ border-left-color: var(--amber); }
+.scenario-card.tag-service_overrun{ border-left-color: var(--blue); }
+.scenario-card.tag-skill_mismatch{ border-left-color: var(--red); }
+.scenario-num{ font-family:'IBM Plex Mono',monospace; font-size: 12px; color: var(--text-dim); }
+.scenario-title{ font-family:'Space Grotesk',sans-serif; font-weight:600; font-size: 16px; margin: 6px 0 8px; }
+.scenario-desc{ font-size: 13px; color: var(--text-dim); margin-bottom: 14px; line-height:1.5; }
+
+/* misc */
+.text-dim{ color: var(--text-dim); }
+.empty-state{ text-align:center; padding: 40px 20px; color: var(--text-dim); }
+.chip{ display:inline-block; background: var(--panel-alt); border:1px solid var(--border); border-radius:999px; padding:3px 10px; font-size:11.5px; margin: 2px 3px 0 0; }

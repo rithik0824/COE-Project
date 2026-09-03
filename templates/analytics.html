@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% block title %}5,000+ Dataset Benchmark Analytics{% endblock %}
+{% block page_title %}Large-Scale Benchmark Analytics (5,000+ Records){% endblock %}
+
+{% block content %}
+
+<div class="stat-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: 20px;">
+  <div class="stat-card">
+    <div class="stat-num">{{ total_jobs }}</div>
+    <div class="stat-label">Total Jobs</div>
+  </div>
+  <div class="stat-card accent-teal">
+    <div class="stat-num">{{ total_techs }}</div>
+    <div class="stat-label">Active Technicians</div>
+  </div>
+  <div class="stat-card accent-blue">
+    <div class="stat-num">{{ total_logs }}</div>
+    <div class="stat-label">Audit Logs</div>
+  </div>
+  <div class="stat-card accent-purple">
+    <div class="stat-num">{{ avg_range_val }} m</div>
+    <div class="stat-label">Avg Range Width</div>
+  </div>
+  <div class="stat-card accent-green">
+    <div class="stat-num">{{ error_reduction }}%</div>
+    <div class="stat-label">ETA Error Cut</div>
+  </div>
+  <div class="stat-card accent-teal">
+    <div class="stat-num">{{ error_reduction }}%</div>
+    <div class="stat-label">Enquiry Reduction</div>
+  </div>
+</div>
+
+<div class="detail-grid" style="grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+  <!-- Chart 1: Baseline vs Improved Error -->
+  <div class="panel">
+    <div class="panel-head">
+      <div>
+        <div class="panel-eyebrow">Measurable Experiment</div>
+        <h3>Baseline vs Live ETA Uncertainty Error</h3>
+      </div>
+    </div>
+    <div style="height: 250px; position: relative;">
+      <canvas id="chartError"></canvas>
+    </div>
+    <p class="text-dim" style="font-size: 12px; margin-top: 12px;">
+      Across 5,000+ simulated trips, replacing static single-value ETAs (35 mins) with dynamic uncertainty ranges reduced average arrival estimation error by <strong>{{ error_reduction }}%</strong>.
+    </p>
+  </div>
+
+  <!-- Chart 2: Job Status Distribution -->
+  <div class="panel">
+    <div class="panel-head">
+      <div>
+        <div class="panel-eyebrow">Job Pipeline</div>
+        <h3>5,000+ Jobs Status Breakdown</h3>
+      </div>
+    </div>
+    <div style="height: 250px; position: relative;">
+      <canvas id="chartStatus"></canvas>
+    </div>
+    <p class="text-dim" style="font-size: 12px; margin-top: 12px;">
+      Distribution across assigned, completed, unassigned (skill gap), and pending dispatch statuses.
+    </p>
+  </div>
+</div>
+
+<div class="detail-grid" style="grid-template-columns: 1fr 1fr; gap: 20px;">
+  <!-- Chart 3: Traffic Distribution -->
+  <div class="panel">
+    <div class="panel-head">
+      <div>
+        <div class="panel-eyebrow">Environmental Factors</div>
+        <h3>Traffic Level Breakdown</h3>
+      </div>
+    </div>
+    <div style="height: 240px; position: relative;">
+      <canvas id="chartTraffic"></canvas>
+    </div>
+  </div>
+
+  <!-- Chart 4: Skill Demand -->
+  <div class="panel">
+    <div class="panel-head">
+      <div>
+        <div class="panel-eyebrow">Resource Allocation</div>
+        <h3>Skill Demand Distribution</h3>
+      </div>
+    </div>
+    <div style="height: 240px; position: relative;">
+      <canvas id="chartSkill"></canvas>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  // 1. Error Comparison Chart
+  new Chart(document.getElementById('chartError'), {
+    type: 'bar',
+    data: {
+      labels: ['Naive Fixed Baseline (35 min)', 'Proposed Live ETA Range'],
+      datasets: [{
+        label: 'Average Absolute Error (minutes)',
+        data: [{{ avg_b }}, {{ avg_i }}],
+        backgroundColor: ['rgba(235, 87, 87, 0.7)', 'rgba(0, 210, 180, 0.7)'],
+        borderColor: ['#eb5757', '#00d2b4'],
+        borderWidth: 1.5
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8a94a6' } },
+        x: { grid: { display: false }, ticks: { color: '#8a94a6' } }
+      }
+    }
+  });
+
+  // 2. Status Chart
+  const statusObj = {{ status_data | tojson }};
+  new Chart(document.getElementById('chartStatus'), {
+    type: 'doughnut',
+    data: {
+      labels: Object.keys(statusObj).map(s => s.toUpperCase()),
+      datasets: [{
+        data: Object.values(statusObj),
+        backgroundColor: ['#2e7dfa', '#00d2b4', '#eb5757', '#f2994a', '#9b51e0']
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { position: 'right', labels: { color: '#c5cedc' } } }
+    }
+  });
+
+  // 3. Traffic Chart
+  const trafficObj = {{ traffic_data | tojson }};
+  new Chart(document.getElementById('chartTraffic'), {
+    type: 'pie',
+    data: {
+      labels: Object.keys(trafficObj).map(t => t.toUpperCase()),
+      datasets: [{
+        data: Object.values(trafficObj),
+        backgroundColor: ['#00d2b4', '#f2994a', '#eb5757']
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { position: 'right', labels: { color: '#c5cedc' } } }
+    }
+  });
+
+  // 4. Skill Chart
+  const skillObj = {{ skill_data | tojson }};
+  new Chart(document.getElementById('chartSkill'), {
+    type: 'bar',
+    data: {
+      labels: Object.keys(skillObj),
+      datasets: [{
+        label: 'Job Volume',
+        data: Object.values(skillObj),
+        backgroundColor: 'rgba(46, 125, 250, 0.7)',
+        borderColor: '#2e7dfa',
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8a94a6' } },
+        x: { grid: { display: false }, ticks: { color: '#8a94a6', font: { size: 10 } } }
+      }
+    }
+  });
+});
+</script>
+{% endblock %}

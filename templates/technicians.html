@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Technicians{% endblock %}
+{% block page_title %}Technicians{% endblock %}
+
+{% block content %}
+
+<div class="detail-grid">
+  <div class="panel">
+    <div class="panel-head">
+      <div>
+        <div class="panel-eyebrow">Field roster</div>
+        <h3>All technicians</h3>
+      </div>
+    </div>
+    <table class="data-table">
+      <thead>
+        <tr><th>Name</th><th>Skills</th><th>Location</th><th>Status</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for t in technicians %}
+        <tr>
+          <td>{{ t.name }}</td>
+          <td>{% for s in t.skills.split(',') %}<span class="chip">{{ s }}</span>{% endfor %}</td>
+          <td class="mono text-dim">{{ '%.4f'|format(t.latitude) }}, {{ '%.4f'|format(t.longitude) }}</td>
+          <td><span class="badge-status badge-{{ t.availability }}">{{ t.availability }}</span></td>
+          <td>
+            <form method="POST" action="{{ url_for('toggle_technician', tech_id=t.id) }}" style="display:flex; gap:6px;">
+              <select name="availability" class="form-control-fl" style="width:auto; padding:5px 8px; font-size:12px;">
+                <option value="available" {{ 'selected' if t.availability=='available' }}>available</option>
+                <option value="busy" {{ 'selected' if t.availability=='busy' }}>busy</option>
+                <option value="unavailable" {{ 'selected' if t.availability=='unavailable' }}>unavailable</option>
+              </select>
+              <button class="btn-fl btn-fl-sm" type="submit">Set</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <div>
+        <div class="panel-eyebrow">Add to roster</div>
+        <h3>New technician</h3>
+      </div>
+    </div>
+    <form method="POST" action="{{ url_for('add_technician') }}">
+      <div class="field-row">
+        <label class="form-label-fl">Full name</label>
+        <input class="form-control-fl" type="text" name="name" required placeholder="e.g. Naveen Kumar">
+      </div>
+      <div class="field-row">
+        <label class="form-label-fl">Skills</label>
+        <div class="check-row">
+          {% for skill in skill_options %}
+          <label class="check-pill">
+            <input type="checkbox" name="skills" value="{{ skill }}"> {{ skill }}
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="field-row">
+        <label class="form-label-fl">Availability</label>
+        <select class="form-control-fl" name="availability">
+          <option value="available">available</option>
+          <option value="busy">busy</option>
+          <option value="unavailable">unavailable</option>
+        </select>
+      </div>
+      <div class="field-row field-grid">
+        <div>
+          <label class="form-label-fl">Latitude</label>
+          <input class="form-control-fl" type="number" step="0.0001" name="latitude" required value="12.98">
+        </div>
+        <div>
+          <label class="form-label-fl">Longitude</label>
+          <input class="form-control-fl" type="number" step="0.0001" name="longitude" required value="80.22">
+        </div>
+      </div>
+      <p class="text-dim" style="font-size:12px; margin: 4px 0 16px;">
+        Coordinates are simulated (any point on the local city grid, e.g. lat 12.90–13.15, lng 80.10–80.30) — no real map lookup is used.
+      </p>
+      <button class="btn-fl btn-fl-primary" type="submit" style="width:100%;">Add technician</button>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
