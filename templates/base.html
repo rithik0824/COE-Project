@@ -41,6 +41,9 @@
       <a href="{{ url_for('analytics') }}" class="{{ 'active' if request.endpoint=='analytics' }}">
         <span class="nav-ic">📊</span> 5k+ Analytics
       </a>
+      <a href="{{ url_for('validation') }}" class="{{ 'active' if request.endpoint=='validation' }}">
+        <span class="nav-ic">📋</span> Pilot &amp; Validation
+      </a>
       <a href="{{ url_for('presentation') }}" class="{{ 'active' if request.endpoint=='presentation' }}">
         <span class="nav-ic">📺</span> Presentation Deck
       </a>

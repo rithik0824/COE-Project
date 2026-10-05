@@ -20,6 +20,13 @@ from flask import Flask, render_template, request, redirect, url_for, flash
 
 from eta_engine import calculate_eta, haversine_km, random_coordinate
 from database import seed_data
+from notification_engine import (
+    log_notification,
+    notify_assignment,
+    notify_eta_update,
+    notify_reassignment,
+    notify_completion,
+)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "database", "eta_system.db")
@@ -66,6 +73,176 @@ def log_assignment(conn, job_id, tech_id, action, reason):
     )
 
 
+def get_customer_phone(job):
+    try:
+        if job and "customer_phone" in job.keys() and job["customer_phone"]:
+            return job["customer_phone"]
+    except Exception:
+        pass
+    return "+91 98400 12345"
+
+
+def handle_technician_availability_change(conn, tech_id, new_status):
+    """
+    Event-driven handler for technician availability changes.
+    - If unavailable: auto-reassigns active jobs to nearest free specialist or flags them,
+      updating ETAs and alerting customers via SMS/Push.
+    - If busy: adds delay buffer (+15 min) to current jobs, updating ETAs with delay reason.
+    - If available: automatically assigns technician to any waiting unassigned jobs.
+    """
+    tech = conn.execute("SELECT * FROM technicians WHERE id=?", (tech_id,)).fetchone()
+    if not tech:
+        return []
+
+    events_triggered = []
+
+    if new_status in ("unavailable", "busy"):
+        active_jobs = conn.execute(
+            "SELECT * FROM jobs WHERE assigned_technician_id=? AND status IN ('assigned', 'en_route')",
+            (tech_id,)
+        ).fetchall()
+
+        for job in active_jobs:
+            if new_status == "unavailable":
+                all_techs = conn.execute("SELECT * FROM technicians WHERE id!=?", (tech_id,)).fetchall()
+                candidates = [
+                    t for t in all_techs
+                    if job["required_skill"] in [s.strip() for s in t["skills"].split(",")]
+                    and t["availability"] == "available"
+                ]
+                if candidates:
+                    replacement = min(candidates, key=lambda t: haversine_km(
+                        t["latitude"], t["longitude"], job["customer_latitude"], job["customer_longitude"]))
+                    eta = calculate_eta(replacement, job)
+                    conn.execute(
+                        """UPDATE jobs SET assigned_technician_id=?, status='assigned',
+                                  eta_low=?, eta_high=?, traffic_level=?, delay_reason=?
+                           WHERE id=?""",
+                        (replacement["id"], eta["eta_low"], eta["eta_high"], eta["traffic_level"], eta["reason"], job["id"])
+                    )
+                    conn.execute("UPDATE technicians SET availability='busy' WHERE id=?", (replacement["id"],))
+                    log_assignment(
+                        conn, job["id"], replacement["id"], "auto_assigned",
+                        f"Auto-reassigned: {tech['name']} became unavailable. Reassigned to {replacement['name']} ({eta['distance_km']} km away)."
+                    )
+                    log_eta(conn, job["id"], eta["eta_low"], eta["eta_high"], f"Auto-reassigned to {replacement['name']}; {eta['reason']}")
+                    notify_reassignment(
+                        conn, job["id"], replacement["name"], eta["eta_low"], eta["eta_high"],
+                        f"Primary technician became unavailable; auto-reassigned to nearest specialist {replacement['name']}",
+                        customer_name=job["customer_name"],
+                        customer_phone=get_customer_phone(job)
+                    )
+                    events_triggered.append(f"Job #{job['id']} auto-reassigned to {replacement['name']}.")
+                else:
+                    conn.execute(
+                        """UPDATE jobs SET assigned_technician_id=NULL, status='unassigned',
+                                  eta_low=NULL, eta_high=NULL,
+                                  delay_reason=?
+                           WHERE id=?""",
+                        (f"Assigned technician {tech['name']} became unavailable; awaiting next specialist.", job["id"])
+                    )
+                    log_assignment(
+                        conn, job["id"], None, "unassigned",
+                        f"Auto-flagged: assigned technician {tech['name']} became unavailable; no other specialist currently free."
+                    )
+                    log_notification(
+                        conn, job["id"], "SMS", get_customer_phone(job),
+                        "Technician Reassignment Pending",
+                        f"Fieldline: Hi {job['customer_name']}, your technician had an unexpected availability conflict. Our dispatch engine is locating the next available specialist.",
+                        trigger_event="availability_change"
+                    )
+                    events_triggered.append(f"Job #{job['id']} flagged as unassigned.")
+
+            elif new_status == "busy":
+                if job["eta_low"] is not None:
+                    new_low = job["eta_low"] + 15
+                    new_high = job["eta_high"] + 18
+                    reason = f"previous appointment extended (+15 min buffer); {job['delay_reason'] or ''}".strip("; ")
+                    conn.execute(
+                        "UPDATE jobs SET eta_low=?, eta_high=?, delay_reason=? WHERE id=?",
+                        (new_low, new_high, reason, job["id"])
+                    )
+                    log_eta(conn, job["id"], new_low, new_high, reason)
+                    notify_eta_update(
+                        conn, job["id"], new_low, new_high,
+                        "Technician schedule delayed due to preceding appointment overrun",
+                        trigger_event="delay_overrun",
+                        tech_name=tech["name"],
+                        customer_name=job["customer_name"],
+                        customer_phone=get_customer_phone(job)
+                    )
+                    events_triggered.append(f"Job #{job['id']} ETA auto-adjusted (+15 min delay).")
+
+    elif new_status == "available":
+        unassigned_jobs = conn.execute(
+            "SELECT * FROM jobs WHERE status='unassigned' ORDER BY id ASC"
+        ).fetchall()
+        for job in unassigned_jobs:
+            if job["required_skill"] in [s.strip() for s in tech["skills"].split(",")]:
+                eta = calculate_eta(tech, job)
+                conn.execute(
+                    """UPDATE jobs SET assigned_technician_id=?, status='assigned',
+                              eta_low=?, eta_high=?, traffic_level=?, delay_reason=?
+                       WHERE id=?""",
+                    (tech["id"], eta["eta_low"], eta["eta_high"], eta["traffic_level"], eta["reason"], job["id"])
+                )
+                conn.execute("UPDATE technicians SET availability='busy' WHERE id=?", (tech["id"],))
+                log_assignment(
+                    conn, job["id"], tech["id"], "auto_assigned",
+                    f"Auto-assigned: technician {tech['name']} became available."
+                )
+                log_eta(conn, job["id"], eta["eta_low"], eta["eta_high"], eta["reason"])
+                notify_assignment(
+                    conn, job["id"], tech["name"], eta["eta_low"], eta["eta_high"],
+                    eta["reason"],
+                    customer_name=job["customer_name"],
+                    customer_phone=get_customer_phone(job)
+                )
+                events_triggered.append(f"Job #{job['id']} auto-assigned to newly available technician {tech['name']}.")
+                break
+
+    conn.commit()
+    return events_triggered
+
+
+def handle_traffic_shift(conn, traffic_level="heavy"):
+    """
+    Event-driven handler for city-wide or route traffic shifts.
+    Automatically recalculates ETA for all active assigned jobs,
+    updates uncertainty ranges, logs to eta_history, and dispatches customer SMS/push alerts.
+    """
+    active_jobs = conn.execute(
+        """SELECT jobs.*, technicians.latitude as tech_lat, technicians.longitude as tech_lng,
+                  technicians.name as tech_name
+           FROM jobs JOIN technicians ON jobs.assigned_technician_id = technicians.id
+           WHERE jobs.status IN ('assigned', 'en_route')
+           LIMIT 100"""
+    ).fetchall()
+
+    updated_count = 0
+    for job in active_jobs:
+        tech_mock = {"latitude": job["tech_lat"], "longitude": job["tech_lng"]}
+        eta = calculate_eta(tech_mock, job, forced_traffic=traffic_level)
+        if eta["eta_low"] != job["eta_low"] or eta["eta_high"] != job["eta_high"]:
+            conn.execute(
+                "UPDATE jobs SET eta_low=?, eta_high=?, traffic_level=?, delay_reason=? WHERE id=?",
+                (eta["eta_low"], eta["eta_high"], traffic_level, eta["reason"], job["id"])
+            )
+            log_eta(conn, job["id"], eta["eta_low"], eta["eta_high"], f"Auto-updated: city traffic shifted to {traffic_level}")
+            notify_eta_update(
+                conn, job["id"], eta["eta_low"], eta["eta_high"],
+                f"Route traffic changed to {traffic_level}",
+                trigger_event="traffic_shift",
+                tech_name=job["tech_name"],
+                customer_name=job["customer_name"],
+                customer_phone=get_customer_phone(job)
+            )
+            updated_count += 1
+
+    conn.commit()
+    return updated_count
+
+
 def auto_assign(conn, job_id):
     """Core assignment algorithm: matching skill + availability + nearest technician."""
     job = conn.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
@@ -84,6 +261,12 @@ def auto_assign(conn, job_id):
         )
         log_assignment(conn, job_id, None, "unassigned",
                         "Auto-assignment failed: no available technician with matching skill.")
+        log_notification(
+            conn, job_id, "SMS", get_customer_phone(job),
+            "Service Request Logged",
+            f"Fieldline: Hi {job['customer_name']}, your {job['required_skill']} request has been logged. Our dispatch engine is locating the next available specialist.",
+            trigger_event="auto_assign"
+        )
         conn.commit()
         return
 
@@ -101,7 +284,13 @@ def auto_assign(conn, job_id):
     log_assignment(conn, job_id, best["id"], "auto_assigned",
                     f"Nearest available technician with matching skill selected ({eta['distance_km']} km away).")
     log_eta(conn, job_id, eta["eta_low"], eta["eta_high"], eta["reason"])
+    notify_assignment(
+        conn, job_id, best["name"], eta["eta_low"], eta["eta_high"], eta["reason"],
+        customer_name=job["customer_name"],
+        customer_phone=get_customer_phone(job)
+    )
     conn.commit()
+
 
 
 # ---------------------------------------------------------------------------
@@ -174,8 +363,10 @@ def toggle_technician(tech_id):
     new_status = request.form["availability"]
     conn.execute("UPDATE technicians SET availability=? WHERE id=?", (new_status, tech_id))
     conn.commit()
+    events = handle_technician_availability_change(conn, tech_id, new_status)
     conn.close()
-    flash(f'{tech["name"]} status updated to "{new_status}".', "info")
+    event_str = f" Automatic events triggered: {'; '.join(events)}" if events else ""
+    flash(f'{tech["name"]} status updated to "{new_status}".{event_str}', "info")
     return redirect(url_for("technicians"))
 
 
@@ -236,6 +427,7 @@ def jobs():
 @app.route("/jobs/add", methods=["POST"])
 def add_job():
     customer_name = request.form["customer_name"].strip()
+    customer_phone = request.form.get("customer_phone", "").strip() or "+91 98400 12345"
     required_skill = request.form["required_skill"]
     lat = float(request.form["latitude"])
     lng = float(request.form["longitude"])
@@ -243,10 +435,10 @@ def add_job():
 
     conn = get_db()
     cur = conn.execute(
-        """INSERT INTO jobs (customer_name, required_skill, customer_latitude, customer_longitude,
+        """INSERT INTO jobs (customer_name, customer_phone, required_skill, customer_latitude, customer_longitude,
                               appointment_time, status)
-           VALUES (?,?,?,?,?,?)""",
-        (customer_name, required_skill, lat, lng, appointment_time, "pending"),
+           VALUES (?,?,?,?,?,?,?)""",
+        (customer_name, customer_phone, required_skill, lat, lng, appointment_time, "pending"),
     )
     job_id = cur.lastrowid
     conn.commit()
@@ -280,11 +472,116 @@ def job_detail(job_id):
            WHERE job_id=? ORDER BY id DESC""",
         (job_id,),
     ).fetchall()
+    customer_notifications = conn.execute(
+        "SELECT * FROM customer_notifications WHERE job_id=? ORDER BY id DESC", (job_id,)
+    ).fetchall()
     conn.close()
     return render_template(
         "job_detail.html", job=job, technicians=all_technicians,
         eta_history=eta_history, assignment_history=assignment_history,
+        customer_notifications=customer_notifications,
     )
+
+
+@app.route("/jobs/<int:job_id>/status", methods=["POST"])
+def update_job_status(job_id):
+    """Automatically updates ETA and alerts customer when real status events occur."""
+    new_status = request.form["status"]
+    conn = get_db()
+    job = conn.execute(
+        """SELECT jobs.*, technicians.name as tech_name, technicians.latitude as tech_lat, technicians.longitude as tech_lng
+           FROM jobs LEFT JOIN technicians ON jobs.assigned_technician_id = technicians.id
+           WHERE jobs.id=?""", (job_id,)
+    ).fetchone()
+
+    if not job:
+        conn.close()
+        flash("Job not found.", "danger")
+        return redirect(url_for("jobs"))
+
+    if new_status == "en_route":
+        if job["assigned_technician_id"]:
+            tech_mock = {"latitude": job["tech_lat"], "longitude": job["tech_lng"]}
+            eta = calculate_eta(tech_mock, job)
+            conn.execute(
+                "UPDATE jobs SET status='en_route', eta_low=?, eta_high=?, traffic_level=?, delay_reason=? WHERE id=?",
+                (eta["eta_low"], eta["eta_high"], eta["traffic_level"], eta["reason"], job_id)
+            )
+            log_assignment(conn, job_id, job["assigned_technician_id"], "en_route", "Technician departed and is actively en route.")
+            log_eta(conn, job_id, eta["eta_low"], eta["eta_high"], "Live update: technician departed en route")
+            notify_eta_update(
+                conn, job_id, eta["eta_low"], eta["eta_high"],
+                f"Technician {job['tech_name']} is now actively en route to your address",
+                trigger_event="en_route",
+                tech_name=job["tech_name"],
+                customer_name=job["customer_name"],
+                customer_phone=get_customer_phone(job)
+            )
+        else:
+            conn.execute("UPDATE jobs SET status='en_route' WHERE id=?", (job_id,))
+        flash("Job status updated to En Route. Customer notified of live ETA window.", "success")
+    elif new_status == "completed":
+        conn.close()
+        return complete_job(job_id)
+    else:
+        conn.execute("UPDATE jobs SET status=? WHERE id=?", (new_status, job_id))
+        flash(f"Job status updated to {new_status}.", "info")
+
+    conn.commit()
+    conn.close()
+    return redirect(url_for("job_detail", job_id=job_id))
+
+
+@app.route("/jobs/<int:job_id>/report-delay", methods=["POST"])
+def report_job_delay(job_id):
+    """Automatically adjusts ETA and cascades delay downstream when service overruns."""
+    delay_minutes = int(request.form.get("delay_minutes", 15))
+    conn = get_db()
+    job = conn.execute(
+        """SELECT jobs.*, technicians.name as tech_name
+           FROM jobs LEFT JOIN technicians ON jobs.assigned_technician_id = technicians.id
+           WHERE jobs.id=?""", (job_id,)
+    ).fetchone()
+
+    if job and job["eta_low"] is not None:
+        new_low = job["eta_low"] + delay_minutes
+        new_high = job["eta_high"] + delay_minutes + 3
+        reason = f"on-site service delay (+{delay_minutes} min); {job['delay_reason'] or ''}".strip("; ")
+        conn.execute(
+            "UPDATE jobs SET eta_low=?, eta_high=?, delay_reason=? WHERE id=?",
+            (new_low, new_high, reason, job_id)
+        )
+        log_eta(conn, job_id, new_low, new_high, f"Service delay reported: +{delay_minutes} mins")
+        notify_eta_update(
+            conn, job_id, new_low, new_high,
+            f"Service delayed by approx {delay_minutes} mins due to on-site complexity",
+            trigger_event="delay_overrun",
+            tech_name=job["tech_name"],
+            customer_name=job["customer_name"],
+            customer_phone=get_customer_phone(job)
+        )
+        flash(f"Reported +{delay_minutes}m delay event. Live ETA range updated and customer alerted.", "warning")
+    conn.commit()
+    conn.close()
+    return redirect(url_for("job_detail", job_id=job_id))
+
+
+@app.route("/jobs/<int:job_id>/notify", methods=["POST"])
+def send_manual_notification(job_id):
+    """Allows dispatcher to send custom simulated SMS/Push/Email to customer."""
+    channel = request.form.get("channel", "SMS")
+    title = request.form.get("title", "Dispatcher Update").strip()
+    message = request.form.get("message", "").strip()
+
+    conn = get_db()
+    job = conn.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
+    if job and message:
+        recipient = get_customer_phone(job) if channel == "SMS" else job["customer_name"]
+        log_notification(conn, job_id, channel, recipient, title, message, trigger_event="manual")
+        conn.commit()
+        flash(f"Manual {channel} notification dispatched to {job['customer_name']}.", "success")
+    conn.close()
+    return redirect(url_for("job_detail", job_id=job_id))
 
 
 @app.route("/jobs/<int:job_id>/override", methods=["POST"])
@@ -316,6 +613,11 @@ def override_job(job_id):
     conn.execute("UPDATE technicians SET availability='busy' WHERE id=?", (technician_id,))
     log_assignment(conn, job_id, technician_id, "manual_override", note)
     log_eta(conn, job_id, eta["eta_low"], eta["eta_high"], reason_text)
+    notify_reassignment(
+        conn, job_id, tech["name"], eta["eta_low"], eta["eta_high"], reason_text,
+        customer_name=job["customer_name"],
+        customer_phone=get_customer_phone(job)
+    )
     conn.commit()
     conn.close()
     flash("Assignment manually overridden by dispatcher." + (" (Skill mismatch flagged)" if not skill_match else ""),
@@ -339,6 +641,13 @@ def resimulate(job_id):
             (eta["eta_low"], eta["eta_high"], eta["traffic_level"], eta["reason"], job_id),
         )
         log_eta(conn, job_id, eta["eta_low"], eta["eta_high"], eta["reason"])
+        notify_eta_update(
+            conn, job_id, eta["eta_low"], eta["eta_high"], eta["reason"],
+            trigger_event="resimulate",
+            tech_name=tech["name"],
+            customer_name=job["customer_name"],
+            customer_phone=get_customer_phone(job)
+        )
         conn.commit()
         flash("ETA re-simulated with current live conditions.", "info")
     conn.close()
@@ -348,24 +657,134 @@ def resimulate(job_id):
 @app.route("/jobs/<int:job_id>/complete", methods=["POST"])
 def complete_job(job_id):
     conn = get_db()
-    job = conn.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
+    job = conn.execute(
+        """SELECT jobs.*, technicians.name as tech_name
+           FROM jobs LEFT JOIN technicians ON jobs.assigned_technician_id = technicians.id
+           WHERE jobs.id=?""", (job_id,)
+    ).fetchone()
     conn.execute("UPDATE jobs SET status='completed' WHERE id=?", (job_id,))
     free_note = "technician freed for new jobs."
-    if job["assigned_technician_id"]:
+    assigned_tech_id = job["assigned_technician_id"]
+    if assigned_tech_id:
         other_active = conn.execute(
-            "SELECT COUNT(*) AS c FROM jobs WHERE assigned_technician_id=? AND status='assigned' AND id!=?",
-            (job["assigned_technician_id"], job_id),
+            "SELECT COUNT(*) AS c FROM jobs WHERE assigned_technician_id=? AND status IN ('assigned', 'en_route') AND id!=?",
+            (assigned_tech_id, job_id),
         ).fetchone()["c"]
         if other_active == 0:
-            conn.execute("UPDATE technicians SET availability='available' WHERE id=?", (job["assigned_technician_id"],))
+            conn.execute("UPDATE technicians SET availability='available' WHERE id=?", (assigned_tech_id,))
+            # Auto-assign freed technician to waiting unassigned jobs
+            handle_technician_availability_change(conn, assigned_tech_id, "available")
         else:
             free_note = "technician still has other active jobs, so availability was left unchanged."
-    log_assignment(conn, job_id, job["assigned_technician_id"], "completed",
+    log_assignment(conn, job_id, assigned_tech_id, "completed",
                     f"Job marked completed by dispatcher; {free_note}")
+    notify_completion(
+        conn, job_id,
+        tech_name=job["tech_name"] if job["tech_name"] else None,
+        customer_name=job["customer_name"],
+        customer_phone=get_customer_phone(job)
+    )
     conn.commit()
     conn.close()
-    flash("Job marked as completed.", "success")
+    flash("Job marked as completed. Customer notified.", "success")
     return redirect(url_for("job_detail", job_id=job_id))
+
+
+@app.route("/track/<int:job_id>")
+def customer_track(job_id):
+    """Customer-facing tracking portal for live ETA and notifications."""
+    conn = get_db()
+    job = conn.execute(
+        """SELECT jobs.*, technicians.name as tech_name, technicians.skills as tech_skills
+           FROM jobs LEFT JOIN technicians ON jobs.assigned_technician_id = technicians.id
+           WHERE jobs.id=?""", (job_id,)
+    ).fetchone()
+
+    if not job:
+        conn.close()
+        return "Service booking not found", 404
+
+    notifications = conn.execute(
+        "SELECT * FROM customer_notifications WHERE job_id=? ORDER BY id DESC", (job_id,)
+    ).fetchall()
+    conn.close()
+    return render_template("customer_track.html", job=job, notifications=notifications)
+
+
+@app.route("/track/<int:job_id>/refresh", methods=["POST"])
+def track_refresh(job_id):
+    """Customer-initiated live status refresh."""
+    conn = get_db()
+    job = conn.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
+    if job and job["assigned_technician_id"] and job["status"] != "completed":
+        tech = conn.execute("SELECT * FROM technicians WHERE id=?", (job["assigned_technician_id"],)).fetchone()
+        eta = calculate_eta(tech, job)
+        conn.execute(
+            "UPDATE jobs SET eta_low=?, eta_high=?, traffic_level=?, delay_reason=? WHERE id=?",
+            (eta["eta_low"], eta["eta_high"], eta["traffic_level"], eta["reason"], job_id)
+        )
+        log_eta(conn, job_id, eta["eta_low"], eta["eta_high"], f"Customer refreshed live ETA ({eta['traffic_level']} traffic)")
+        notify_eta_update(
+            conn, job_id, eta["eta_low"], eta["eta_high"],
+            f"Live status refresh: {eta['traffic_level']} traffic on route",
+            trigger_event="customer_refresh",
+            tech_name=tech["name"],
+            customer_name=job["customer_name"],
+            customer_phone=get_customer_phone(job)
+        )
+        conn.commit()
+    conn.close()
+    return redirect(url_for("customer_track", job_id=job_id))
+
+
+@app.route("/validation")
+def validation():
+    """Stakeholder & User Validation page: Pilot study KPIs, interview transcripts, and live feedback."""
+    conn = get_db()
+    feedback_list = conn.execute(
+        "SELECT * FROM stakeholder_feedback ORDER BY id DESC"
+    ).fetchall()
+    conn.close()
+    return render_template("validation.html", feedback_list=feedback_list)
+
+
+@app.route("/validation/feedback", methods=["POST"])
+def submit_feedback():
+    """Allows stakeholders / evaluators to submit live validation feedback."""
+    name = request.form.get("stakeholder_name", "").strip()
+    role = request.form.get("role", "Project Evaluator").strip()
+    area = request.form.get("organization_or_area", "Metro Operations").strip()
+    rating = int(request.form.get("rating", 5))
+    category = request.form.get("category", "ETA Accuracy").strip()
+    text = request.form.get("feedback_text", "").strip()
+
+    if name and text:
+        conn = get_db()
+        conn.execute(
+            """INSERT INTO stakeholder_feedback
+               (stakeholder_name, role, organization_or_area, rating, category, feedback_text)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (name, role, area, rating, category, text)
+        )
+        conn.commit()
+        conn.close()
+        flash("Thank you! Stakeholder validation feedback recorded into database.", "success")
+    else:
+        flash("Please provide your name and comments.", "warning")
+
+    return redirect(url_for("validation"))
+
+
+@app.route("/events/traffic-shift", methods=["POST"])
+def traffic_shift_event():
+    """Simulates a city-wide traffic condition shift, auto-updating all active job ETAs."""
+    traffic_level = request.form.get("traffic_level", "heavy")
+    conn = get_db()
+    updated_count = handle_traffic_shift(conn, traffic_level)
+    conn.close()
+    flash(f"⚡ City-wide traffic shift to '{traffic_level}' applied: automatically recalculated ETAs and dispatched SMS/Push alerts to {updated_count} active jobs.", "info")
+    return redirect(request.referrer or url_for("dashboard"))
+
 
 
 @app.route("/demo")

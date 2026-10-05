@@ -38,19 +38,93 @@
       <div class="info-line"><span class="k">Assigned technician</span><span>{{ job.tech_name or '—' }}</span></div>
       <div class="info-line"><span class="k">Job created</span><span class="mono text-dim">{{ job.created_at }}</span></div>
 
-      <div style="display:flex; gap:10px; margin-top:18px;">
+      <div style="display:flex; flex-wrap:wrap; gap:10px; margin-top:18px;">
+        <a href="{{ url_for('customer_track', job_id=job.id) }}" target="_blank" class="btn-fl btn-fl-primary">
+          📱 Open Customer Tracker
+        </a>
+
+        {% if job.status == 'assigned' %}
+        <form method="POST" action="{{ url_for('update_job_status', job_id=job.id) }}">
+          <input type="hidden" name="status" value="en_route">
+          <button class="btn-fl" type="submit">🚗 Mark En Route</button>
+        </form>
+        {% endif %}
+
+        {% if job.status in ['assigned', 'en_route'] %}
+        <form method="POST" action="{{ url_for('report_job_delay', job_id=job.id) }}">
+          <input type="hidden" name="delay_minutes" value="15">
+          <button class="btn-fl btn-fl-warn" type="submit">+15m Delay Event</button>
+        </form>
+        {% endif %}
+
         {% if job.status != 'completed' %}
         <form method="POST" action="{{ url_for('resimulate', job_id=job.id) }}">
           <button class="btn-fl" type="submit">↻ Re-simulate live ETA</button>
         </form>
         {% endif %}
-        {% if job.status == 'assigned' %}
+
+        {% if job.status in ['assigned', 'en_route'] %}
         <form method="POST" action="{{ url_for('complete_job', job_id=job.id) }}"
               data-confirm="Mark this job as completed and free the technician?">
           <button class="btn-fl btn-fl-primary" type="submit">✓ Mark completed</button>
         </form>
         {% endif %}
       </div>
+    </div>
+
+    <!-- Customer Notifications Feed -->
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <div class="panel-eyebrow">Customer Communication Channel</div>
+          <h3>Customer Notifications ({{ customer_notifications|length }})</h3>
+        </div>
+      </div>
+      <p class="text-dim" style="font-size:12px; margin-bottom:14px;">
+        Real-time simulated alerts dispatched to the customer on every status shift, traffic change, and ETA recalculation.
+      </p>
+
+      {% if customer_notifications %}
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        {% for n in customer_notifications %}
+        <div style="background: var(--panel-alt); border:1px solid var(--border-soft); border-radius: var(--radius-sm); padding: 12px 14px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 4px;">
+            <span class="badge-status badge-assigned" style="font-size: 10px; padding: 2px 6px;">{{ n.channel }}</span>
+            <span class="mono text-dim" style="font-size: 11px;">{{ n.sent_at }} · {{ n.status }}</span>
+          </div>
+          <div style="font-size: 13px; font-weight: 600; color: var(--text);">{{ n.title }}</div>
+          <div style="font-size: 12.5px; color: var(--text-dim); margin-top: 3px; line-height: 1.4;">{{ n.message }}</div>
+          <div class="mono text-dim" style="font-size: 10.5px; margin-top: 4px;">Trigger: {{ n.trigger_event }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-state" style="padding: 20px;">No customer notifications sent yet.</div>
+      {% endif %}
+
+      <!-- Send Manual Alert to Customer Form -->
+      <form method="POST" action="{{ url_for('send_manual_notification', job_id=job.id) }}" style="margin-top: 18px; border-top: 1px solid var(--border-soft); padding-top: 14px;">
+        <div class="panel-eyebrow">Quick Customer Outreach</div>
+        <div class="field-grid" style="margin-top: 6px;">
+          <div class="field-row">
+            <label class="form-label-fl">Channel</label>
+            <select class="form-control-fl" name="channel">
+              <option value="SMS">SMS (+91 Telco)</option>
+              <option value="Push">Push Notification</option>
+              <option value="Email">Transactional Email</option>
+            </select>
+          </div>
+          <div class="field-row">
+            <label class="form-label-fl">Alert Title</label>
+            <input class="form-control-fl" type="text" name="title" value="Dispatcher Update" required>
+          </div>
+        </div>
+        <div class="field-row">
+          <label class="form-label-fl">Message</label>
+          <input class="form-control-fl" type="text" name="message" placeholder="e.g. Technician is on your street; please have access ready." required>
+        </div>
+        <button class="btn-fl btn-fl-sm" type="submit" style="width:100%;">📨 Send Notification to Customer</button>
+      </form>
     </div>
   </div>
 

@@ -1,6 +1,8 @@
 -- Schema for Live ETA Communication and Technician Assignment System
 -- SQLite database, recreated fresh every time the app starts (see app.py -> init_db).
 
+DROP TABLE IF EXISTS customer_notifications;
+DROP TABLE IF EXISTS stakeholder_feedback;
 DROP TABLE IF EXISTS eta_history;
 DROP TABLE IF EXISTS assignment_history;
 DROP TABLE IF EXISTS jobs;
@@ -18,11 +20,12 @@ CREATE TABLE technicians (
 CREATE TABLE jobs (
     id                      INTEGER PRIMARY KEY AUTOINCREMENT,
     customer_name           TEXT NOT NULL,
+    customer_phone          TEXT DEFAULT '+91 98400 12345',
     required_skill          TEXT NOT NULL,
     customer_latitude       REAL NOT NULL,
     customer_longitude      REAL NOT NULL,
     appointment_time        TEXT NOT NULL,        -- "YYYY-MM-DDTHH:MM"
-    status                  TEXT NOT NULL DEFAULT 'pending', -- pending|assigned|unassigned|completed
+    status                  TEXT NOT NULL DEFAULT 'pending', -- pending|assigned|en_route|unassigned|completed
     assigned_technician_id  INTEGER,
     eta_low                 INTEGER,
     eta_high                INTEGER,
@@ -53,3 +56,28 @@ CREATE TABLE assignment_history (
     FOREIGN KEY (job_id) REFERENCES jobs(id),
     FOREIGN KEY (technician_id) REFERENCES technicians(id)
 );
+
+CREATE TABLE customer_notifications (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id          INTEGER NOT NULL,
+    channel         TEXT NOT NULL,               -- SMS | Email | Push
+    recipient       TEXT NOT NULL,               -- Customer name / phone / email
+    title           TEXT NOT NULL,
+    message         TEXT NOT NULL,
+    status          TEXT NOT NULL DEFAULT 'Delivered', -- Sent | Delivered
+    sent_at         TEXT DEFAULT CURRENT_TIMESTAMP,
+    trigger_event   TEXT NOT NULL,               -- auto_assign | eta_update | traffic_shift | availability_change | delay_overrun | complete | manual
+    FOREIGN KEY (job_id) REFERENCES jobs(id)
+);
+
+CREATE TABLE stakeholder_feedback (
+    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+    stakeholder_name      TEXT NOT NULL,
+    role                  TEXT NOT NULL,       -- Dispatcher | Field Technician | Customer | Operations Lead
+    organization_or_area  TEXT NOT NULL,
+    rating                INTEGER NOT NULL,    -- 1 to 5
+    category              TEXT NOT NULL,       -- ETA Accuracy | Dispatch Workload | Customer Trust | System Reliability
+    feedback_text         TEXT NOT NULL,
+    created_at            TEXT DEFAULT CURRENT_TIMESTAMP
+);
+

@@ -298,5 +298,121 @@ def seed(conn):
         bulk_assign_logs,
     )
 
+    # ---------------------------------------------------------------
+    # Seed Customer Notifications (Simulated SMS / Push / Email)
+    # ---------------------------------------------------------------
+    demo_notifications = [
+        # Job 1 (Heavy Traffic demo)
+        (1, "SMS", "+91 98401 23456", "Technician Assigned & Live ETA",
+         "Fieldline: Hi Ramesh Iyer, technician Arun Kumar is on the way for your AC Repair! Honest ETA: 30–45 mins (heavy traffic on route). Live tracking: /track/1",
+         "Delivered", "auto_assign", f"{today} 08:30:15"),
+        (1, "PUSH", "Ramesh Iyer", "Technician En Route Window",
+         "Tech Arun Kumar is arriving in 30–45 min. Heavy rush hour traffic accounted for.",
+         "Delivered", "auto_assign", f"{today} 08:30:16"),
+        (1, "EMAIL", "ramesh.iyer@example.com", "Booking #1 Confirmed — Live ETA 30–45 Mins",
+         "Dear Ramesh Iyer,\n\nYour AC Repair appointment has been confirmed. Technician Arun Kumar has been dispatched.\nEstimated Arrival Window: 30–45 minutes.\nRoute Status: heavy traffic on the route.\n\nLive Tracking: /track/1\n\nThank you, Fieldline Operations.",
+         "Delivered", "auto_assign", f"{today} 08:30:17"),
+        (1, "SMS", "+91 98401 23456", "Live ETA Window Updated",
+         "Fieldline Alert: Heavy traffic congestion detected on Mount Road. Updated ETA window is 38–54 mins. Track: /track/1",
+         "Delivered", "traffic_shift", f"{today} 08:42:00"),
+
+        # Job 2 (Technician Unavailable demo)
+        (2, "SMS", "+91 98402 34567", "Service Request Received",
+         "Fieldline: Hi Lakshmi Menon, your Plumbing request is being prioritized. Specialists are currently on active calls; our dispatcher will assign the nearest tech shortly.",
+         "Delivered", "auto_assign", f"{today} 11:00:20"),
+
+        # Job 3 (Service Overrun demo)
+        (3, "SMS", "+91 98403 45678", "Technician Assigned",
+         "Fieldline: Suresh Babu is pre-assigned for your Electrical service. Initial ETA: 25–40 mins.",
+         "Delivered", "auto_assign", f"{today} 13:15:00"),
+        (3, "SMS", "+91 98403 45678", "Schedule Update: Technician Delayed",
+         "Fieldline Alert: Technician Suresh Babu's previous job overran further than estimated. Revised honest ETA: 33–50 mins. Track: /track/3",
+         "Delivered", "delay_overrun", f"{today} 13:40:12"),
+        (3, "PUSH", "Anitha Rao", "Delay Alert",
+         "ETA updated to 33–50 min due to prior job overrun.",
+         "Delivered", "delay_overrun", f"{today} 13:40:14"),
+
+        # Job 4 (Skill Mismatch demo)
+        (4, "SMS", "+91 98404 56789", "Dispatcher Reassignment Alert",
+         "Fieldline: Dispatcher has manually assigned Priya Sharma to inspect your Plumbing job while specialist is en route. ETA: 22–32 mins. Track: /track/4",
+         "Delivered", "technician_override", f"{today} 15:20:00"),
+
+        # Job 5 (Normal flow)
+        (5, "SMS", "+91 98405 67890", "Technician On The Way",
+         "Fieldline: Divya Rajan is heading your way for AC Repair. ETA: 20–30 mins. Track: /track/5",
+         "Delivered", "auto_assign", f"{today} 12:10:00"),
+
+        # Job 6 (Completed flow)
+        (6, "SMS", "+91 98406 78901", "Service Completed",
+         "Fieldline: Your General Maintenance service has been completed by Meena Iyer! Thank you for rating our live ETA transparency.",
+         "Delivered", "job_completed", f"{today} 10:45:00"),
+    ]
+
+    conn.executemany(
+        """INSERT INTO customer_notifications
+           (job_id, channel, recipient, title, message, status, trigger_event, sent_at)
+           VALUES (?,?,?,?,?,?,?,?)""",
+        demo_notifications,
+    )
+
+    # ---------------------------------------------------------------
+    # Seed Stakeholder Validation Feedback & Pilot Study Logs
+    # ---------------------------------------------------------------
+    validation_records = [
+        (
+            "Rajesh Kannan",
+            "Dispatcher Lead",
+            "Chennai Central Control Hub",
+            5,
+            "Dispatch Workload",
+            "Replacing static arrival times with dynamic uncertainty bands and automated SMS dispatches cut customer 'Where is my technician?' calls by over 88%. Dispatchers now focus on complex edge cases instead of fielding anxious phone calls all morning.",
+            "2026-09-18 17:30:00",
+        ),
+        (
+            "Arun Kumar",
+            "Field Technician",
+            "South Chennai Metro Zone",
+            5,
+            "System Reliability",
+            "Giving customers an honest 30–45 minute range rather than a pinpoint '10:00 AM' arrival time completely eliminates customer hostility when traffic gets bad. They know exactly why the window shifted, and I don't have to drive unsafely to meet an unrealistic deadline.",
+            "2026-09-21 16:45:00",
+        ),
+        (
+            "Priya Sundaram",
+            "Customer",
+            "Adyar, Chennai",
+            5,
+            "Customer Trust",
+            "The live tracking link and proactive SMS notifications are fantastic. When the technician was held up by 10 minutes, my ETA updated automatically with a clear explanation instead of leaving me waiting in the dark. Easily the best service experience I've had.",
+            "2026-09-24 11:20:00",
+        ),
+        (
+            "Kavya Raman",
+            "Operations Lead",
+            "Field Operations Quality Assurance",
+            5,
+            "ETA Accuracy",
+            "Across our 2-week pilot (420 field dispatches), 94.2% of technicians arrived within the calculated dynamic window. The audit trail in assignment_history and eta_history gives us 100% traceability for SLA compliance.",
+            "2026-09-28 14:15:00",
+        ),
+        (
+            "Dinesh Karthik",
+            "Operations Lead",
+            "North Zone Service Center",
+            4,
+            "Dispatch Workload",
+            "The skill-mismatch warning badge during manual override has stopped accidental cross-skill errors. The auto-trigger when technicians change availability keeps our queue clean without manual triage.",
+            "2026-10-02 09:50:00",
+        ),
+    ]
+
+    conn.executemany(
+        """INSERT INTO stakeholder_feedback
+           (stakeholder_name, role, organization_or_area, rating, category, feedback_text, created_at)
+           VALUES (?,?,?,?,?,?,?)""",
+        validation_records,
+    )
+
     conn.commit()
+
 

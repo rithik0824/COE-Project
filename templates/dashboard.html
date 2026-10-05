@@ -20,6 +20,31 @@
   </div>
 </div>
 
+<!-- Real-Time Event-Driven ETA Simulator Bar -->
+<div class="panel" style="margin-bottom: 20px; padding: 16px 20px; background: var(--panel-alt); border-color: rgba(42,214,176,0.25);">
+  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+    <div>
+      <div style="font-size:11.5px; font-weight:600; color:var(--teal); text-transform:uppercase; letter-spacing:0.04em;">
+        ⚡ Event-Driven Dispatch Pipeline Active
+      </div>
+      <div style="font-size:13px; color:var(--text); margin-top:2px;">
+        ETAs update automatically from real status transitions, technician toggles, and traffic events — no manual clicks required.
+      </div>
+    </div>
+    <div style="display:flex; gap:10px; align-items:center;">
+      <form method="POST" action="{{ url_for('traffic_shift_event') }}" style="margin:0;">
+        <input type="hidden" name="traffic_level" value="heavy">
+        <button class="btn-fl btn-fl-warn btn-fl-sm" type="submit">🚨 Trigger Rush Hour Traffic Surge</button>
+      </form>
+      <form method="POST" action="{{ url_for('traffic_shift_event') }}" style="margin:0;">
+        <input type="hidden" name="traffic_level" value="light">
+        <button class="btn-fl btn-fl-sm" type="submit">🟢 Trigger Off-Peak Traffic Clearance</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+
 <div class="stat-grid">
   <div class="stat-card">
     <div class="stat-num">{{ stats.total_jobs }}</div>
