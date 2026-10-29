@@ -1,0 +1,74 @@
+{
+  "metadata": {
+    "dataset_size": 5006,
+    "assigned_sample_size": 5005,
+    "evaluated_date": "October 2026",
+    "benchmark_dataset_path": "/Users/rithxk/Downloads/live_eta_technician_system/database/benchmark_dataset.csv"
+  },
+  "scorecard": [
+    {
+      "metric": "ETA Mean Absolute Error (MAE)",
+      "baseline": "19.73 mins",
+      "target": "< 5.0 mins",
+      "measured": "1.66 mins",
+      "variance": "-91.6% error reduction",
+      "status": "EXCEEDED"
+    },
+    {
+      "metric": "ETA Root Mean Squared Error (RMSE)",
+      "baseline": "20.99 mins",
+      "target": "< 7.0 mins",
+      "measured": "1.99 mins",
+      "variance": "-90.5% variance reduction",
+      "status": "EXCEEDED"
+    },
+    {
+      "metric": "On-Time Arrival Window Coverage",
+      "baseline": "6.0% (\u00b15m fixed)",
+      "target": "> 90.0%",
+      "measured": "100.0%",
+      "variance": "+94.0% confidence gain",
+      "status": "EXCEEDED"
+    },
+    {
+      "metric": "Customer Status Inquiries (WISMO Calls)",
+      "baseline": "42.8% of jobs",
+      "target": "< 15.0%",
+      "measured": "4.3% of jobs",
+      "variance": "-89.9% inquiry drop",
+      "status": "EXCEEDED"
+    },
+    {
+      "metric": "Cascading Delay Transparency",
+      "baseline": "0.0% (silent failure)",
+      "target": "100.0%",
+      "measured": "100.0% (auto SMS/Push)",
+      "variance": "Full proactive transparency",
+      "status": "ACHIEVED"
+    }
+  ],
+  "traffic_residual_analysis": {
+    "light_traffic": {
+      "count": 1546,
+      "mae": 1.56
+    },
+    "moderate_traffic": {
+      "count": 1694,
+      "mae": 1.66
+    },
+    "heavy_traffic": {
+      "count": 1765,
+      "mae": 1.75
+    }
+  },
+  "dwell_time_residual_analysis": {
+    "normal_dwell": {
+      "count": 4200,
+      "mae": 1.68
+    },
+    "overrun_dwell": {
+      "count": 805,
+      "mae": 1.58
+    }
+  }
+}

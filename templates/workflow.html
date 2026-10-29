@@ -1,0 +1,242 @@
+{% extends "base.html" %}
+
+{% block title %}Field-Workflow Map{% endblock %}
+{% block page_title %}Field-Workflow Map &amp; Service Architecture{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+  <!-- Top Banner -->
+  <div class="col-12">
+    <div class="panel" style="border-left: 4px solid var(--teal);">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
+        <div>
+          <span class="badge" style="background: var(--teal-dim); color: var(--teal); border: 1px solid var(--teal); margin-bottom: 8px;">
+            COE Project Deliverable: Field-Workflow Map
+          </span>
+          <h2 style="font-size: 20px; font-weight: 700; margin-top: 4px;">
+            Autonomous Field-Service Lifecycle &amp; Telemetry Architecture
+          </h2>
+          <p style="color: var(--text-dim); margin-bottom: 0; max-width: 900px; font-size: 13.5px;">
+            Mapping the real-time progression from customer service booking to skill-based matching, GPS telemetry ingestion,
+            dwell-time overrun detection, dynamic uncertainty range formulation, and transparent multi-channel customer communication.
+          </p>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <a href="{{ url_for('experiment') }}" class="btn btn-sm btn-outline-info" style="font-size: 12px;">View Experiment</a>
+          <a href="{{ url_for('failure_modes') }}" class="btn btn-sm btn-outline-warning" style="font-size: 12px;">Failure-Mode Analysis</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Interactive Workflow Visual Pipeline -->
+  <div class="col-12">
+    <div class="panel">
+      <h3 style="font-size: 16px; margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">
+        <span style="color: var(--teal);">🗺</span> End-to-End Pipeline Stages (8 Synchronized Phases)
+      </h3>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px;">
+        
+        <!-- Stage 1 -->
+        <div style="background: var(--panel-raised); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 18px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <span class="mono" style="font-size: 11px; color: var(--teal); background: var(--teal-dim); padding: 2px 6px; border-radius: 4px;">STAGE 01</span>
+            <span style="font-size: 16px;">📅</span>
+          </div>
+          <h4 style="font-size: 14.5px; font-weight: 600;">Booking &amp; SLA Commitment</h4>
+          <p style="font-size: 12.5px; color: var(--text-dim); margin-bottom: 12px;">
+            Customer submits request with required skill (e.g. AC Repair) and location coordinates. SLA tolerance window established.
+          </p>
+          <div class="mono" style="font-size: 11px; color: var(--text-faint); border-top: 1px dashed var(--border-soft); padding-top: 8px;">
+            Input: Skill, Lat/Lon, Time
+          </div>
+        </div>
+
+        <!-- Stage 2 -->
+        <div style="background: var(--panel-raised); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 18px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <span class="mono" style="font-size: 11px; color: var(--blue); background: var(--blue-dim); padding: 2px 6px; border-radius: 4px;">STAGE 02</span>
+            <span style="font-size: 16px;">🎯</span>
+          </div>
+          <h4 style="font-size: 14.5px; font-weight: 600;">Skill Match &amp; Distance</h4>
+          <p style="font-size: 12.5px; color: var(--text-dim); margin-bottom: 12px;">
+            Roster filtered for active certified technicians. Haversine distance matrix computed to find nearest eligible candidate.
+          </p>
+          <div class="mono" style="font-size: 11px; color: var(--text-faint); border-top: 1px dashed var(--border-soft); padding-top: 8px;">
+            Filter: Skills ∩ Available
+          </div>
+        </div>
+
+        <!-- Stage 3 -->
+        <div style="background: var(--panel-raised); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 18px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <span class="mono" style="font-size: 11px; color: var(--blue); background: var(--blue-dim); padding: 2px 6px; border-radius: 4px;">STAGE 03</span>
+            <span style="font-size: 16px;">🛰</span>
+          </div>
+          <h4 style="font-size: 14.5px; font-weight: 600;">Vehicle Telemetry &amp; Traffic</h4>
+          <p style="font-size: 12.5px; color: var(--text-dim); margin-bottom: 12px;">
+            Ingests simulated vehicle position. Ingests time-of-day traffic model (rush-hour 1.7x multiplier vs midday 1.3x vs light 1.0x).
+          </p>
+          <div class="mono" style="font-size: 11px; color: var(--text-faint); border-top: 1px dashed var(--border-soft); padding-top: 8px;">
+            Speed: 24 km/h × Multiplier
+          </div>
+        </div>
+
+        <!-- Stage 4 -->
+        <div style="background: var(--panel-raised); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 18px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <span class="mono" style="font-size: 11px; color: var(--amber); background: var(--amber-dim); padding: 2px 6px; border-radius: 4px;">STAGE 04</span>
+            <span style="font-size: 16px;">⏳</span>
+          </div>
+          <h4 style="font-size: 14.5px; font-weight: 600;">Dwell Time &amp; Overrun Tail</h4>
+          <p style="font-size: 12.5px; color: var(--text-dim); margin-bottom: 12px;">
+            Checks prior appointment status. Lognormal tail models unscheduled complications (16% risk) adding +12–28 min cascading delay.
+          </p>
+          <div class="mono" style="font-size: 11px; color: var(--text-faint); border-top: 1px dashed var(--border-soft); padding-top: 8px;">
+            Dwell: ~40m + Overrun Tail
+          </div>
+        </div>
+
+        <!-- Stage 5 -->
+        <div style="background: var(--panel-raised); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 18px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <span class="mono" style="font-size: 11px; color: var(--teal); background: var(--teal-dim); padding: 2px 6px; border-radius: 4px;">STAGE 05</span>
+            <span style="font-size: 16px;">📊</span>
+          </div>
+          <h4 style="font-size: 14.5px; font-weight: 600;">Dynamic Uncertainty Band</h4>
+          <p style="font-size: 12.5px; color: var(--text-dim); margin-bottom: 12px;">
+            Rejects false single-point precision. Synthesizes honest range [eta_low, eta_high] expanding with traffic volatility and delay risk.
+          </p>
+          <div class="mono" style="font-size: 11px; color: var(--text-faint); border-top: 1px dashed var(--border-soft); padding-top: 8px;">
+            Band: Total ± (Uncertainty / 2)
+          </div>
+        </div>
+
+        <!-- Stage 6 -->
+        <div style="background: var(--panel-raised); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 18px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <span class="mono" style="font-size: 11px; color: var(--teal); background: var(--teal-dim); padding: 2px 6px; border-radius: 4px;">STAGE 06</span>
+            <span style="font-size: 16px;">📲</span>
+          </div>
+          <h4 style="font-size: 14.5px; font-weight: 600;">Customer Multi-Channel Alert</h4>
+          <p style="font-size: 12.5px; color: var(--text-dim); margin-bottom: 12px;">
+            Dispatches automated SMS, Push, and Email containing the honest range, explicit delay reason, and live tracking web portal link.
+          </p>
+          <div class="mono" style="font-size: 11px; color: var(--text-faint); border-top: 1px dashed var(--border-soft); padding-top: 8px;">
+            Channels: SMS, Push, Email
+          </div>
+        </div>
+
+        <!-- Stage 7 -->
+        <div style="background: var(--panel-raised); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 18px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <span class="mono" style="font-size: 11px; color: var(--red); background: var(--red-dim); padding: 2px 6px; border-radius: 4px;">STAGE 07</span>
+            <span style="font-size: 16px;">⚡</span>
+          </div>
+          <h4 style="font-size: 14.5px; font-weight: 600;">Event Triggers &amp; Overrides</h4>
+          <p style="font-size: 12.5px; color: var(--text-dim); margin-bottom: 12px;">
+            Autonomous handlers react to availability shifts, traffic surges, or manual dispatcher skill-mismatch overrides with full audit logging.
+          </p>
+          <div class="mono" style="font-size: 11px; color: var(--text-faint); border-top: 1px dashed var(--border-soft); padding-top: 8px;">
+            Audit: assignment_history
+          </div>
+        </div>
+
+        <!-- Stage 8 -->
+        <div style="background: var(--panel-raised); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 18px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <span class="mono" style="font-size: 11px; color: var(--teal); background: var(--teal-dim); padding: 2px 6px; border-radius: 4px;">STAGE 08</span>
+            <span style="font-size: 16px;">🏁</span>
+          </div>
+          <h4 style="font-size: 14.5px; font-weight: 600;">Completion &amp; Feedback</h4>
+          <p style="font-size: 12.5px; color: var(--text-dim); margin-bottom: 12px;">
+            Job marked completed, technician freed to 'available' to auto-pickup waiting jobs. Stakeholder pilot review persisted in SQLite.
+          </p>
+          <div class="mono" style="font-size: 11px; color: var(--text-faint); border-top: 1px dashed var(--border-soft); padding-top: 8px;">
+            Feedback: CSAT 4.8 / 5.0
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Traditional vs Proposed Workflow Comparative Table -->
+  <div class="col-12">
+    <div class="panel">
+      <h3 style="font-size: 16px; margin-bottom: 16px;">
+        ⚖️ Architectural Comparison: Traditional Dispatch vs. Proposed Live ETA System
+      </h3>
+      <div class="table-responsive">
+        <table class="table table-dark table-borderless table-striped" style="margin-bottom: 0; font-size: 13.5px;">
+          <thead>
+            <tr style="border-bottom: 2px solid var(--border);">
+              <th style="width: 25%;">Workflow Dimension</th>
+              <th style="width: 35%; color: var(--red);">Traditional Dispatch Workflow</th>
+              <th style="width: 40%; color: var(--teal);">Proposed Live ETA Communication Service</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Arrival Prediction</strong></td>
+              <td style="color: var(--text-dim);">Single exact timestamp (e.g. "10:30 AM") creating false precision.</td>
+              <td style="color: var(--teal); font-weight: 500;">Honest uncertainty window (e.g. "30–45 mins") reflecting actual transit physics.</td>
+            </tr>
+            <tr>
+              <td><strong>Delay Communication</strong></td>
+              <td style="color: var(--text-dim);">Silent failure. Customers left in the dark until after appointment missed.</td>
+              <td style="color: var(--text);">Proactive SMS/Push with explicit reason ("heavy traffic on Mount Road", "prior job overrun").</td>
+            </tr>
+            <tr>
+              <td><strong>Prior Job Dwell Time</strong></td>
+              <td style="color: var(--text-dim);">Treated as isolated events; cascading overruns blindside downstream jobs.</td>
+              <td style="color: var(--text);">Autonomous event listener recalculates downstream windows and alerts customers in advance.</td>
+            </tr>
+            <tr>
+              <td><strong>Dispatcher Override</strong></td>
+              <td style="color: var(--text-dim);">Unaudited manual changes; zero history of reasons or skill discrepancies.</td>
+              <td style="color: var(--text);">Mandatory justification prompt; full immutable audit logging in <span class="mono">assignment_history</span>.</td>
+            </tr>
+            <tr>
+              <td><strong>Customer Status Inquiries</strong></td>
+              <td style="color: var(--red); font-weight: 600;">42.8% inquiry rate (high WISMO call volume clogging call centers).</td>
+              <td style="color: var(--teal); font-weight: 600;">4.3% inquiry rate (89.9% reduction in anxious status calls).</td>
+            </tr>
+            <tr>
+              <td><strong>API &amp; Cloud Licensing</strong></td>
+              <td style="color: var(--text-dim);">Costly recurring Google Maps Distance Matrix and SaaS cloud fees.</td>
+              <td style="color: var(--teal); font-weight: 600;">100% Local, zero-cost architecture in pure Python and SQLite.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Operational Flow Documentation Card -->
+  <div class="col-12">
+    <div class="panel" style="background: var(--panel-raised);">
+      <h3 style="font-size: 15px; margin-bottom: 10px;">📄 Full Workflow Specification &amp; Architecture Map</h3>
+      <p style="color: var(--text-dim); font-size: 13px; margin-bottom: 14px;">
+        For exhaustive mathematical formulations, Mermaid sequence diagrams, state-transition rules, and data contracts,
+        refer to the project technical documentation:
+      </p>
+      <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+        <span class="mono" style="font-size: 12px; background: var(--panel); border: 1px solid var(--border); padding: 6px 12px; border-radius: 6px;">
+          FIELD_WORKFLOW_MAP.md
+        </span>
+        <span class="mono" style="font-size: 12px; background: var(--panel); border: 1px solid var(--border); padding: 6px 12px; border-radius: 6px;">
+          data_generation_script.py
+        </span>
+        <span class="mono" style="font-size: 12px; background: var(--panel); border: 1px solid var(--border); padding: 6px 12px; border-radius: 6px;">
+          run_experiment.py
+        </span>
+        <span class="mono" style="font-size: 12px; background: var(--panel); border: 1px solid var(--border); padding: 6px 12px; border-radius: 6px;">
+          FAILURE_MODE_ANALYSIS.md
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

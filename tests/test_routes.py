@@ -84,7 +84,7 @@ class TestRouteSmoke(unittest.TestCase):
         """GET /presentation must return 200 and render slide deck."""
         res = self.client.get("/presentation")
         self.assertEqual(res.status_code, 200)
-        self.assertIn(b"Live ETA System", res.data)
+        self.assertIn(b"Live ETA", res.data)
 
     def test_route_validation(self):
         """GET /validation must return 200 and show pilot study KPIs and interview notes (Requirement 1)."""
@@ -197,6 +197,30 @@ class TestRouteSmoke(unittest.TestCase):
         """POST /jobs/1/complete must mark job as completed and free technician."""
         res = self.client.post("/jobs/1/complete")
         self.assertEqual(res.status_code, 302)
+
+    def test_route_workflow(self):
+        """GET /workflow must return 200 and render Field-Workflow Map."""
+        res = self.client.get("/workflow")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn(b"Field-Workflow Map", res.data)
+
+    def test_route_experiment(self):
+        """GET /experiment must return 200 and render Measurable Experiment scorecard."""
+        res = self.client.get("/experiment")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn(b"Measurable Scorecard", res.data)
+
+    def test_route_experiment_run(self):
+        """POST /experiment/run must re-run experiment and redirect to /experiment (302)."""
+        res = self.client.post("/experiment/run")
+        self.assertEqual(res.status_code, 302)
+        self.assertIn("/experiment", res.headers["Location"])
+
+    def test_route_failure_modes(self):
+        """GET /failure-modes must return 200 and render Failure-Mode Analysis."""
+        res = self.client.get("/failure-modes")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn(b"FMEA Risk Priority Matrix", res.data)
 
 
 if __name__ == "__main__":

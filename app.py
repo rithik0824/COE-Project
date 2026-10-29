@@ -12,6 +12,7 @@ Then open http://127.0.0.1:5000 in a browser.
 """
 
 import os
+import json
 import random
 import sqlite3
 from datetime import datetime, timedelta
@@ -903,6 +904,46 @@ def analytics():
         avg_i=avg_i,
         error_reduction=error_reduction,
     )
+
+
+@app.route("/workflow")
+def workflow():
+    return render_template("workflow.html")
+
+
+@app.route("/failure-modes")
+def failure_modes():
+    return render_template("failure_modes.html")
+
+
+@app.route("/experiment")
+def experiment():
+    results_path = os.path.join(BASE_DIR, "database", "experiment_results.json")
+    if not os.path.exists(results_path):
+        import run_experiment
+        results = run_experiment.run_experiment()
+    else:
+        with open(results_path, "r", encoding="utf-8") as f:
+            results = json.load(f)
+
+    scorecard = results.get("scorecard", [])
+    traffic_analysis = results.get("traffic_residual_analysis", {})
+    dwell_analysis = results.get("dwell_time_residual_analysis", {})
+
+    return render_template(
+        "experiment.html",
+        scorecard=scorecard,
+        traffic_analysis=traffic_analysis,
+        dwell_analysis=dwell_analysis,
+    )
+
+
+@app.route("/experiment/run", methods=["POST"])
+def run_experiment_action():
+    import run_experiment
+    run_experiment.run_experiment()
+    flash("Benchmark experiment across 5,006 jobs executed successfully! Metrics refreshed.", "success")
+    return redirect(url_for("experiment"))
 
 
 @app.route("/presentation")

@@ -26,11 +26,20 @@
       <a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint=='dashboard' }}">
         <span class="nav-ic">▤</span> Overview
       </a>
+      <a href="{{ url_for('workflow') }}" class="{{ 'active' if request.endpoint=='workflow' }}">
+        <span class="nav-ic">🗺</span> Workflow Map
+      </a>
       <a href="{{ url_for('jobs') }}" class="{{ 'active' if request.endpoint in ['jobs','job_detail'] }}">
         <span class="nav-ic">◉</span> Jobs
       </a>
       <a href="{{ url_for('technicians') }}" class="{{ 'active' if request.endpoint=='technicians' }}">
         <span class="nav-ic">◈</span> Technicians
+      </a>
+      <a href="{{ url_for('experiment') }}" class="{{ 'active' if request.endpoint=='experiment' }}">
+        <span class="nav-ic">🔬</span> Experiment
+      </a>
+      <a href="{{ url_for('failure_modes') }}" class="{{ 'active' if request.endpoint=='failure_modes' }}">
+        <span class="nav-ic">🛡</span> Failure Modes
       </a>
       <a href="{{ url_for('demo') }}" class="{{ 'active' if request.endpoint=='demo' }}">
         <span class="nav-ic">▲</span> Demo Scenarios
