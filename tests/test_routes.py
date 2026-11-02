@@ -222,6 +222,12 @@ class TestRouteSmoke(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         self.assertIn(b"FMEA Risk Priority Matrix", res.data)
 
+    def test_route_report(self):
+        """GET /report must return 200 and render Project Review Report."""
+        res = self.client.get("/report")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn(b"Project Review Report", res.data)
+
 
 if __name__ == "__main__":
     unittest.main()

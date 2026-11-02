@@ -1130,6 +1130,23 @@ def presentation():
     return render_template("presentation.html")
 
 
+@app.route("/report")
+def report():
+    """
+    Comprehensive Project & Milestone Review Report.
+    
+    Renders the formal academic submission report including:
+    - 35%+ milestone completion status (100% functional components).
+    - Evaluator feedback & corrective action matrix.
+    - Prescribed 8 deliverables compliance status.
+    - Relational database schema & 27 REST endpoint directory.
+    - Unit testing architecture (63 tests) and 5-layer error boundaries.
+    - Measurable experiment scorecard (-91.6% MAE reduction).
+    - Print-ready PDF export via browser window.print().
+    """
+    return render_template("report.html")
+
+
 # ---------------------------------------------------------------------------
 # Error Boundaries & Resilience Handlers
 # ---------------------------------------------------------------------------
