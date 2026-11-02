@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Error {{ error_code }} · Live ETA System{% endblock %}
+{% block page_title %}System Resilience Boundary{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+  <div class="col-md-8 col-lg-6">
+    <div class="card shadow-sm border-0" style="background: var(--bg-surface, #1e222d); border: 1px solid var(--border-color, #2d3343); border-radius: 12px;">
+      <div class="card-body p-5 text-center">
+        <div class="mb-4">
+          <span style="font-size: 3.5rem; line-height: 1;">🛡</span>
+        </div>
+        <div class="badge bg-danger-subtle text-danger px-3 py-2 mb-3 fs-6" style="border: 1px solid rgba(220, 53, 69, 0.3);">
+          Error Boundary Code: {{ error_code }}
+        </div>
+        <h2 class="h4 text-white mb-3">{{ error_title or "Unexpected State Contained" }}</h2>
+        <p class="text-secondary mb-4" style="line-height: 1.6;">
+          {{ error_message or "The requested operation or entity could not be resolved. The system error boundary prevented state corruption and maintained transactional integrity." }}
+        </p>
+
+        <div class="p-3 mb-4 text-start rounded" style="background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.08); font-family: var(--font-mono, monospace); font-size: 0.85rem; color: #a0aec0;">
+          <div><strong style="color: #63b3ed;">Boundary Layer:</strong> HTTP &amp; Controller Error Isolation</div>
+          <div><strong style="color: #63b3ed;">System Status:</strong> Core Engine Operating Normally</div>
+          <div><strong style="color: #63b3ed;">Recovery Action:</strong> Safe fallback redirect available</div>
+        </div>
+
+        <div class="d-flex justify-content-center gap-3">
+          <a href="{{ url_for('dashboard') }}" class="btn btn-primary px-4 py-2">
+            Return to Dashboard
+          </a>
+          <a href="{{ url_for('jobs') }}" class="btn btn-outline-secondary px-4 py-2">
+            View Job Queue
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

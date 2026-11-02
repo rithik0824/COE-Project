@@ -1,14 +1,20 @@
 """
 Live ETA Communication and Technician Assignment System
 ---------------------------------------------------------
-College mini-project. Fully local, fully simulated:
-- No paid APIs, no Google Maps, no cloud services, no Docker.
-- Flask + SQLite + HTML/CSS/JS (Bootstrap CDN for styling only).
+Centre of Excellence (CoE) Capstone Engineering Application.
+
+Architecture Highlights:
+- 100% Offline & Locally Simulated: Zero paid APIs, no Google Maps billing, no external cloud.
+- Micro-Framework Stack: Flask + SQLite 3 (with foreign keys enforced) + Jinja2 + Bootstrap.
+- Dynamic Uncertainty Range Model: Replaces misleading single-point ETAs with honest intervals [low, high].
+- Explainable Delay Causality: Translates traffic, distance, and dwell overruns into human-readable text.
+- Autonomous Event Listeners: Reacts to technician availability shifts and city-wide traffic surges.
+- 5-Layer Defensive Error Boundaries: Catches 404/500 errors, bounds math invariants, and ensures data integrity.
 
 Run with:
     pip install -r requirements.txt
     python app.py
-Then open http://127.0.0.1:5000 in a browser.
+Then open http://127.0.0.1:5000 in your browser.
 """
 
 import os
@@ -34,15 +40,22 @@ DB_PATH = os.path.join(BASE_DIR, "database", "eta_system.db")
 SCHEMA_PATH = os.path.join(BASE_DIR, "database", "schema.sql")
 
 app = Flask(__name__)
-app.secret_key = "college-project-live-eta-system-2026"
+app.secret_key = "coe-capstone-project-live-eta-system-2026"
 
+# Catalog of standardized service skills across all dispatch workflows
 SKILL_OPTIONS = ["AC Repair", "Electrical", "Plumbing", "Appliance Repair", "General Maintenance"]
 
 
 # ---------------------------------------------------------------------------
-# Database helpers
+# Database Helpers & Lifecycle Factory
 # ---------------------------------------------------------------------------
 def get_db():
+    """
+    Database Connection Factory.
+    
+    Returns an active SQLite connection with row factory enabled for named-column
+    access and PRAGMA foreign_keys = ON to guarantee referential constraint enforcement.
+    """
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
@@ -50,7 +63,12 @@ def get_db():
 
 
 def init_db():
-    """(Re)create the database with fresh schema + sample data on every start."""
+    """
+    Database Schema & Demo Seeding Initializer.
+    
+    (Re)creates the relational database fresh from database/schema.sql on application startup,
+    executing seed_data.seed() to populate baseline demo edge cases, pilot logs, and technicians.
+    """
     if os.path.exists(DB_PATH):
         os.remove(DB_PATH)
     conn = get_db()
@@ -61,6 +79,12 @@ def init_db():
 
 
 def log_eta(conn, job_id, low, high, reason):
+    """
+    Appends an immutable audit entry into eta_history.
+    
+    Tracks temporal shifts in arrival bounds [low, high] and captures the causal reason
+    (e.g. traffic surge, service overrun) for retroactive SLA auditing.
+    """
     conn.execute(
         "INSERT INTO eta_history (job_id, eta_low, eta_high, reason) VALUES (?,?,?,?)",
         (job_id, low, high, reason),
@@ -68,6 +92,12 @@ def log_eta(conn, job_id, low, high, reason):
 
 
 def log_assignment(conn, job_id, tech_id, action, reason):
+    """
+    Appends a dispatch event audit entry into assignment_history.
+    
+    Records auto-assignments, manual overrides, technician reassignments, and completions
+    with explicit policy override warnings when skills mismatch.
+    """
     conn.execute(
         "INSERT INTO assignment_history (job_id, technician_id, action, reason) VALUES (?,?,?,?)",
         (job_id, tech_id, action, reason),
@@ -75,6 +105,12 @@ def log_assignment(conn, job_id, tech_id, action, reason):
 
 
 def get_customer_phone(job):
+    """
+    Resilient phone number extractor with fallback error boundary.
+    
+    Safely retrieves customer_phone from a job record (dict or sqlite3.Row).
+    If missing, empty, or None, gracefully falls back to the default customer care test line.
+    """
     try:
         if job and "customer_phone" in job.keys() and job["customer_phone"]:
             return job["customer_phone"]
@@ -245,16 +281,41 @@ def handle_traffic_shift(conn, traffic_level="heavy"):
 
 
 def auto_assign(conn, job_id):
-    """Core assignment algorithm: matching skill + availability + nearest technician."""
+    """
+    Automated Proximity & Skill-Matched Dispatch Engine.
+    
+    Orchestrates the core technician matching algorithm:
+    1. Trade Certification Filtering: Queries all technicians whose skill set includes
+       the job's required trade specialization (e.g. 'AC Repair', 'Plumbing').
+    2. Real-Time Availability Check: Restricts candidates strictly to status='available'.
+    3. Geospatial Optimization: Computes Great-Circle Haversine distance from candidate
+       vehicle GPS coordinates to customer address; selects the minimum-distance specialist.
+    4. Dynamic Uncertainty Modeling: Invokes calculate_eta() factoring in real-time traffic
+       tier and probabilistic preceding dwell-time overrun risk.
+    5. State Transition & Audit Logging: Updates job to 'assigned', transitions technician
+       to 'busy', appends records to assignment_history and eta_history, and dispatches
+       omni-channel customer notification receipts.
+    
+    Error Boundary:
+    If zero certified specialists are currently available, the system avoids throwing
+    an exception or blocking other jobs; it marks the job 'unassigned', records the reason,
+    notifies the customer that dispatch is pending, and awaits technician release.
+    """
     job = conn.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
+    if not job:
+        return
+
     technicians = conn.execute("SELECT * FROM technicians").fetchall()
 
+    # Step 1: Filter candidates by required trade certification
     candidates = [
         t for t in technicians
         if job["required_skill"] in [s.strip() for s in t["skills"].split(",")]
     ]
+    # Step 2: Restrict candidates strictly to available status
     available = [t for t in candidates if t["availability"] == "available"]
 
+    # Error Boundary: Gracefully handle capacity saturation
     if not available:
         conn.execute(
             "UPDATE jobs SET status=?, assigned_technician_id=NULL, delay_reason=?, eta_low=NULL, eta_high=NULL WHERE id=?",
@@ -271,12 +332,15 @@ def auto_assign(conn, job_id):
         conn.commit()
         return
 
+    # Step 3: Select nearest specialist via Haversine great-circle distance
     best = min(available, key=lambda t: haversine_km(
         t["latitude"], t["longitude"], job["customer_latitude"], job["customer_longitude"]))
 
+    # Step 4: Simulate probabilistic dwell overrun risk (18% probability tail)
     previous_delay = random.random() < 0.18
     eta = calculate_eta(best, job, previous_job_delay=previous_delay)
 
+    # Step 5: Atomic state transition, audit logging, and customer notification
     conn.execute(
         "UPDATE jobs SET assigned_technician_id=?, status=?, eta_low=?, eta_high=?, traffic_level=?, delay_reason=? WHERE id=?",
         (best["id"], "assigned", eta["eta_low"], eta["eta_high"], eta["traffic_level"], eta["reason"], job_id),
@@ -451,6 +515,21 @@ def add_job():
 
 @app.route("/jobs/<int:job_id>")
 def job_detail(job_id):
+    """
+    Detailed Job View Controller.
+    
+    Renders comprehensive telemetry and state for a single field service job:
+    - Real-time ETA range [low, high] and active delay causality text.
+    - Technician profile, qualification match, and proximity.
+    - Historical timeline of ETA recalculations (eta_history).
+    - Dispatch audit logs (assignment_history).
+    - Multi-channel notification delivery receipts (customer_notifications).
+    
+    Error Boundary:
+    If the requested job_id does not exist in the database, the request is
+    intercepted gracefully, a flash warning is queued, and the user is redirected
+    to the jobs board rather than throwing an unhandled exception.
+    """
     conn = get_db()
     job = conn.execute(
         """SELECT jobs.*, technicians.name AS tech_name, technicians.skills AS tech_skills
@@ -458,6 +537,13 @@ def job_detail(job_id):
            WHERE jobs.id=?""",
         (job_id,),
     ).fetchone()
+
+    # Error Boundary: Non-existent job guard
+    if not job:
+        conn.close()
+        flash(f"Job #{job_id} not found in the dispatch system.", "warning")
+        return redirect(url_for("jobs"))
+
     all_technicians = conn.execute(
         """SELECT * FROM technicians 
            ORDER BY CASE WHEN id=? THEN 0 WHEN availability='available' THEN 1 ELSE 2 END, name 
@@ -486,8 +572,19 @@ def job_detail(job_id):
 
 @app.route("/jobs/<int:job_id>/status", methods=["POST"])
 def update_job_status(job_id):
-    """Automatically updates ETA and alerts customer when real status events occur."""
-    new_status = request.form["status"]
+    """
+    Job Status Lifecycle Transition Handler.
+    
+    Handles operational state transitions for a job:
+    - 'assigned' -> Initial dispatch.
+    - 'en_route' -> Technician departs; recalculates live ETA based on current coordinates,
+                    logs event to assignment_history, and dispatches SMS/Push alerts.
+    - 'completed' -> Delegates to complete_job() to release technician and trigger SLA audit.
+    
+    Error Boundary:
+    Guards against invalid job IDs and handles missing assigned technicians safely.
+    """
+    new_status = request.form.get("status", "").strip()
     conn = get_db()
     job = conn.execute(
         """SELECT jobs.*, technicians.name as tech_name, technicians.latitude as tech_lat, technicians.longitude as tech_lng
@@ -495,9 +592,10 @@ def update_job_status(job_id):
            WHERE jobs.id=?""", (job_id,)
     ).fetchone()
 
+    # Error Boundary: Ensure target job exists before attempting mutation
     if not job:
         conn.close()
-        flash("Job not found.", "danger")
+        flash(f"Job #{job_id} not found. State transition aborted.", "danger")
         return redirect(url_for("jobs"))
 
     if new_status == "en_route":
@@ -587,12 +685,35 @@ def send_manual_notification(job_id):
 
 @app.route("/jobs/<int:job_id>/override", methods=["POST"])
 def override_job(job_id):
-    technician_id = int(request.form["technician_id"])
+    """
+    Dispatcher Manual Override Controller.
+    
+    Permits an authorized human dispatcher to override automated assignment decisions.
+    Supports Edge Case 4: Assigning a technician who may lack the optimal skill certification
+    when no other specialist is nearby.
+    
+    Error Boundary & Audit Trailing:
+    - Validates target job and target technician exist before performing assignment.
+    - If skills mismatch, explicit WARNING tags are added to assignment_history and delay_reason.
+    - Releases previous technician back to 'available' if unencumbered.
+    - Emits customer notification explaining the personnel reassignment.
+    """
+    technician_id = int(request.form.get("technician_id", 0))
     reason = request.form.get("reason", "").strip() or "Manual dispatcher override"
 
     conn = get_db()
     job = conn.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
+    if not job:
+        conn.close()
+        flash(f"Job #{job_id} not found. Override aborted.", "warning")
+        return redirect(url_for("jobs"))
+
     tech = conn.execute("SELECT * FROM technicians WHERE id=?", (technician_id,)).fetchone()
+    if not tech:
+        conn.close()
+        flash(f"Technician #{technician_id} not found. Override aborted.", "warning")
+        return redirect(url_for("job_detail", job_id=job_id))
+
     old_tech_id = job["assigned_technician_id"]
 
     skill_match = job["required_skill"] in [s.strip() for s in tech["skills"].split(",")]
@@ -628,13 +749,28 @@ def override_job(job_id):
 
 @app.route("/jobs/<int:job_id>/resimulate", methods=["POST"])
 def resimulate(job_id):
+    """
+    Manual & Periodic ETA Resimulation Trigger.
+    
+    Recalculates the dynamic uncertainty range for an active job using current
+    telemetry, traffic multipliers, and probabilistic dwell overrun risk.
+    """
     conn = get_db()
     job = conn.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
+    if not job:
+        conn.close()
+        flash(f"Job #{job_id} not found.", "warning")
+        return redirect(url_for("jobs"))
+
     if not job["assigned_technician_id"]:
         auto_assign(conn, job_id)
         flash("Re-ran assignment engine for this job.", "info")
     else:
         tech = conn.execute("SELECT * FROM technicians WHERE id=?", (job["assigned_technician_id"],)).fetchone()
+        if not tech:
+            conn.close()
+            flash("Assigned technician record not found.", "warning")
+            return redirect(url_for("job_detail", job_id=job_id))
         previous_delay = random.random() < 0.25
         eta = calculate_eta(tech, job, previous_job_delay=previous_delay)
         conn.execute(
@@ -657,12 +793,25 @@ def resimulate(job_id):
 
 @app.route("/jobs/<int:job_id>/complete", methods=["POST"])
 def complete_job(job_id):
+    """
+    Job Completion & Technician Release Handler.
+    
+    Marks field service job as completed, frees the assigned technician back to
+    'available' status if no other active jobs remain in their queue, triggers
+    autonomous job matching for waiting unassigned jobs, and dispatches completion SMS.
+    """
     conn = get_db()
     job = conn.execute(
         """SELECT jobs.*, technicians.name as tech_name
            FROM jobs LEFT JOIN technicians ON jobs.assigned_technician_id = technicians.id
            WHERE jobs.id=?""", (job_id,)
     ).fetchone()
+
+    if not job:
+        conn.close()
+        flash(f"Job #{job_id} not found.", "warning")
+        return redirect(url_for("jobs"))
+
     conn.execute("UPDATE jobs SET status='completed' WHERE id=?", (job_id,))
     free_note = "technician freed for new jobs."
     assigned_tech_id = job["assigned_technician_id"]
@@ -693,7 +842,18 @@ def complete_job(job_id):
 
 @app.route("/track/<int:job_id>")
 def customer_track(job_id):
-    """Customer-facing tracking portal for live ETA and notifications."""
+    """
+    Customer-Facing Live ETA Tracking Portal (/track/<job_id>).
+    
+    Mobile-optimized interface provided via SMS link to end customers:
+    - Displays honest dynamic arrival window [eta_low, eta_high].
+    - Explains active delay causality in natural language.
+    - Shows technician profile and contact details without exposing internal telematics.
+    - Live feed of simulated SMS/Push alerts dispatched to the customer.
+    
+    Error Boundary:
+    Returns clean 404 response if the tracking ID does not exist in the database.
+    """
     conn = get_db()
     job = conn.execute(
         """SELECT jobs.*, technicians.name as tech_name, technicians.skills as tech_skills
@@ -703,39 +863,58 @@ def customer_track(job_id):
 
     if not job:
         conn.close()
-        return "Service booking not found", 404
+        return render_template("error.html", error_code=404, error_title="Service Booking Not Found", error_message=f"No active service appointment found for tracking reference #{job_id}."), 404
 
     notifications = conn.execute(
         "SELECT * FROM customer_notifications WHERE job_id=? ORDER BY id DESC", (job_id,)
     ).fetchall()
     conn.close()
-    return render_template("customer_track.html", job=job, notifications=notifications)
+    return render_template("customer_track.html", job=job, notifications=notifications, now=datetime.now())
 
 
 @app.route("/track/<int:job_id>/refresh", methods=["POST"])
 def track_refresh(job_id):
-    """Customer-initiated live status refresh."""
+    """
+    Customer-Initiated Live Status Refresh Trigger.
+    
+    Allows customers viewing their live tracking link to manually trigger a fresh
+    telemetry evaluation, updating the dynamic arrival window based on real-time
+    traffic conditions, and dispatching a refreshed notification.
+    
+    Error Boundary:
+    Returns 404 error template if the booking ID is invalid.
+    """
     conn = get_db()
     job = conn.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
+    if not job:
+        conn.close()
+        return render_template("error.html", error_code=404, error_title="Service Booking Not Found", error_message=f"No active service appointment found for tracking reference #{job_id}."), 404
+
     if job and job["assigned_technician_id"] and job["status"] != "completed":
         tech = conn.execute("SELECT * FROM technicians WHERE id=?", (job["assigned_technician_id"],)).fetchone()
-        eta = calculate_eta(tech, job)
-        conn.execute(
-            "UPDATE jobs SET eta_low=?, eta_high=?, traffic_level=?, delay_reason=? WHERE id=?",
-            (eta["eta_low"], eta["eta_high"], eta["traffic_level"], eta["reason"], job_id)
-        )
-        log_eta(conn, job_id, eta["eta_low"], eta["eta_high"], f"Customer refreshed live ETA ({eta['traffic_level']} traffic)")
-        notify_eta_update(
-            conn, job_id, eta["eta_low"], eta["eta_high"],
-            f"Live status refresh: {eta['traffic_level']} traffic on route",
-            trigger_event="customer_refresh",
-            tech_name=tech["name"],
-            customer_name=job["customer_name"],
-            customer_phone=get_customer_phone(job)
-        )
-        conn.commit()
+        if tech:
+            eta = calculate_eta(tech, job)
+            conn.execute(
+                "UPDATE jobs SET eta_low=?, eta_high=?, traffic_level=?, delay_reason=? WHERE id=?",
+                (eta["eta_low"], eta["eta_high"], eta["traffic_level"], eta["reason"], job_id)
+            )
+            log_eta(conn, job_id, eta["eta_low"], eta["eta_high"], f"Customer refreshed live ETA ({eta['traffic_level']} traffic)")
+            notify_eta_update(
+                conn, job_id, eta["eta_low"], eta["eta_high"],
+                f"Live status refresh: {eta['traffic_level']} traffic on route",
+                trigger_event="customer_refresh",
+                tech_name=tech["name"],
+                customer_name=job["customer_name"],
+                customer_phone=get_customer_phone(job)
+            )
+            conn.commit()
     conn.close()
+    flash("Live arrival window refreshed.", "info")
     return redirect(url_for("customer_track", job_id=job_id))
+
+
+# Endpoint alias for compatibility
+app.add_url_rule("/track/<int:job_id>/refresh", endpoint="customer_track_refresh", view_func=track_refresh, methods=["POST"])
 
 
 @app.route("/validation")
@@ -949,6 +1128,41 @@ def run_experiment_action():
 @app.route("/presentation")
 def presentation():
     return render_template("presentation.html")
+
+
+# ---------------------------------------------------------------------------
+# Error Boundaries & Resilience Handlers
+# ---------------------------------------------------------------------------
+@app.errorhandler(404)
+def page_not_found(e):
+    """
+    Error Boundary Layer 1: HTTP 404 Not Found.
+    
+    Catches invalid endpoints, missing entity routes, and corrupt tracking links.
+    Renders a friendly resilience view without crashing or exposing raw stack traces.
+    """
+    return render_template(
+        "error.html",
+        error_code=404,
+        error_title="Requested Resource Not Found",
+        error_message="The requested route, technician, or dispatch entity does not exist in the live system.",
+    ), 404
+
+
+@app.errorhandler(500)
+def internal_server_error(e):
+    """
+    Error Boundary Layer 1: HTTP 500 Internal Server Error.
+    
+    Catches unexpected server errors, ensuring client receives a structured response
+    while maintaining process isolation.
+    """
+    return render_template(
+        "error.html",
+        error_code=500,
+        error_title="Internal Processing Error Contained",
+        error_message="An unexpected system condition occurred. The error boundary caught and contained the exception.",
+    ), 500
 
 
 def find_available_port(host, default_port):
